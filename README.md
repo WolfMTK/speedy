@@ -1,2 +1,2 @@
-# cuttlefish
+# speedy
 In development
