@@ -1,8 +1,13 @@
-from .asgi_types import Scope, ASGIReceiveCallable, ASGISendCallable, WebSocketReceiveMessage, Message
+from .asgi_types import (
+    ASGIVersions,
+    HttpMethod,
+    HttpScope,
+    WebSocketScope
+)
 
 __all__ = (
-    'Scope',
-    'ASGIReceiveCallable',
-    'ASGISendCallable',
-    'Message'
+    'ASGIVersions',
+    'HttpMethod',
+    'HttpScope',
+    'WebSocketScope'
 )
