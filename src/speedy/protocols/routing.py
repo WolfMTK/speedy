@@ -3,12 +3,12 @@ from abc import ABC
 from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable
 
 
-class BaseASGIApplication(ABC):
-    """ Base ASGI application protocol. """
+class BaseRoute(ABC):
+    """ Base route class. """
 
-    async def __call__(
-            self,
-            scope: Scope,
+    async def handle(
+            self, scope: Scope,
             receive: ASGIReceiveCallable,
             send: ASGISendCallable
-    ) -> None: ...
+    ) -> None:
+        """ ASGI App of the route. """
