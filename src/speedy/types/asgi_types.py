@@ -289,10 +289,10 @@ type LifeSpanSendMessage = Union[
     LifespanShutdownFailedEvent
 ]
 
-ASGISendEvent = Union[
+type ASGISendEvent = Union[
     HTTPSendMessage,
     WebSocketSendMessage,
     LifeSpanSendMessage
 ]
 
-ASGISendCallable = Callable[[ASGISendEvent], Awaitable[None]]
+type ASGISendCallable = Callable[[ASGISendEvent], Awaitable[None]]
