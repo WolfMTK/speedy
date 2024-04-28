@@ -3,7 +3,10 @@ from typing import (
     Literal,
     TypedDict,
     Iterable,
-    NotRequired, Any, Callable, Awaitable,
+    NotRequired,
+    Any,
+    Callable,
+    Awaitable,
 )
 
 from speedy import HttpMethod, ScopeType
