@@ -8,7 +8,7 @@ from .asgi_types import (
     ASGIReceiveCallable,
     ASGISendCallable,
 )
-from .application import ASGIApplication
+from .application_types import ASGIApplication
 
 __all__ = (
     'ASGIVersions',
