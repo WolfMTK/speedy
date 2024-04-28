@@ -4,6 +4,8 @@ from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable
 
 
 class BaseASGIApplication(Protocol):
+    """ Base ASGI application protocol. """
+
     async def __call__(
             self,
             scope: Scope,
