@@ -51,5 +51,4 @@ def get_asyncio_executor() -> ThreadPoolExecutor | None:
     Getting the executor in which to execute synchronous calls
     in asyncio context.
     """
-
     return _State.EXECUTOR
