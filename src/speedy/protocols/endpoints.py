@@ -1,6 +1,8 @@
 from abc import ABC
 from typing import Iterator, Any
 
+from speedy.requests import Request
+
 
 class BaseEndpoint(ABC):
     def __await__(self) -> Iterator[Any]:
@@ -10,7 +12,7 @@ class BaseEndpoint(ABC):
 
 
 class BaseHTTPEndpoint(BaseEndpoint):
-    async def method_not_allowed(self): ...
+    async def method_not_allowed(self, request: Request): ...
 
 
 class BaseWebSocketEndpoint(BaseEndpoint):

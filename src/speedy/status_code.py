@@ -147,9 +147,9 @@ HTTP_307_TEMPORARY_REDIRECT: Final = 307
 # HTTP status code `Permanent Redirect`
 HTTP_308_PERMANENT_REDIRECT: Final = 308
 
-#####################
-# 400th status codes#
-#####################
+######################
+# 400th status codes #
+######################
 # HTTP status code `Bad Request`
 HTTP_400_BAD_REQUEST: Final = 400
 # HTTP status code `Unauthorized`
