@@ -1,20 +1,47 @@
-from typing import Protocol
+from typing import Protocol, Any
+
+
+class HTTPGet(Protocol):
+    def get(self, *args: Any, **kwargs: Any) -> Any: ...
+
+
+class HTTPPost(Protocol):
+    def post(self, *args: Any, **kwargs: Any) -> Any: ...
+
+
+class HTTPDelete(Protocol):
+    def delete(self, *args: Any, **kwargs: Any) -> Any: ...
+
+
+class HTTPPatch(Protocol):
+    def patch(self, *args: Any, **kwargs: Any) -> Any: ...
+
+
+class HTTPPut(Protocol):
+    def put(self, *args: Any, **kwargs: Any) -> Any: ...
+
+
+class HTTPHead(Protocol):
+    def head(self, *args: Any, **kwargs: Any) -> Any: ...
+
+
+class HTTPTrace(Protocol):
+    def trace(self, *args: Any, **kwargs: Any) -> Any: ...
+
+
+class HTTPOptions(Protocol):
+    def options(self, *args: Any, **kwargs: Any) -> Any: ...
 
 
 # TODO: add specific arguments when implementing an application class
-class BaseHTTPMethods(Protocol):
-    def get(self, *args, **kwargs): ...
-
-    def post(self, *args, **kwargs): ...
-
-    def delete(self, *args, **kwargs): ...
-
-    def patch(self, *args, **kwargs): ...
-
-    def put(self, *args, **kwargs): ...
-
-    def head(self, *args, **kwargs): ...
-
-    def trace(self, *args, **kwargs): ...
-
-    def options(self, *args, **kwargs): ...
+class BaseHTTPMethods(
+    HTTPGet,
+    HTTPPost,
+    HTTPDelete,
+    HTTPPatch,
+    HTTPPut,
+    HTTPHead,
+    HTTPTrace,
+    HTTPOptions
+):
+    pass
