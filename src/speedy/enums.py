@@ -15,3 +15,7 @@ class HttpMethod(StrEnum):
 class ScopeType(StrEnum):
     HTTP = 'http'
     WEBSOCKET = 'websocket'
+
+
+class MediaTextType(StrEnum):
+    plain = 'text/plain'
