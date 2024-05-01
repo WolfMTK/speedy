@@ -15,4 +15,13 @@ class HttpMethod(StrEnum):
 class ScopeType(StrEnum):
     HTTP = 'http'
     WEBSOCKET = 'websocket'
-    LIFESPAN = 'lifespan'
+
+
+class MediaTextType(StrEnum):
+    PLAIN = 'text/plain'
+
+
+class WebSocketEncoding(StrEnum):
+    TEXT = 'text'
+    BYTES = 'bytes'
+    JSON = 'json'
