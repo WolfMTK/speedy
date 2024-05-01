@@ -18,4 +18,10 @@ class ScopeType(StrEnum):
 
 
 class MediaTextType(StrEnum):
-    plain = 'text/plain'
+    PLAIN = 'text/plain'
+
+
+class WebSocketEncoding(StrEnum):
+    TEXT = 'text'
+    BYTES = 'bytes'
+    JSON = 'json'
