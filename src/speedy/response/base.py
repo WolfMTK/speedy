@@ -6,7 +6,7 @@ from speedy.status_code import HTTP_200_OK
 from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable
 
 
-class ASGIBaseResponse(AbstractResponse):
+class ASGIResponse(AbstractResponse):
     """ Base ASGI response class. """
 
     def __init__(
