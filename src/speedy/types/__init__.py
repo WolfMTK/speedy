@@ -1,3 +1,4 @@
+from .application_types import ASGIApplication
 from .asgi_types import (
     ASGIVersions,
     HttpMethod,
@@ -7,8 +8,8 @@ from .asgi_types import (
     Scope,
     ASGIReceiveCallable,
     ASGISendCallable,
+    Message,
 )
-from .application_types import ASGIApplication
 
 __all__ = (
     'ASGIVersions',
@@ -19,5 +20,6 @@ __all__ = (
     'Scope',
     'ASGIReceiveCallable',
     'ASGISendCallable',
-    'ASGIApplication'
+    'ASGIApplication',
+    'Message'
 )
