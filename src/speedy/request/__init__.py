@@ -1,4 +1,4 @@
-from request import Request
+from .base import Request
 
 __all__ = (
     'Request',
