@@ -1,7 +1,7 @@
-from .base import ASGIBaseResponse
+from .base import ASGIResponse
 from .plain import PlainTextResponse
 
 __all__ = (
-    'ASGIBaseResponse',
+    'ASGIResponse',
     'PlainTextResponse'
 )
