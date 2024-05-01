@@ -19,3 +19,14 @@ class HTTPException(Exception):
 
     def __repr__(self) -> str:
         return f'{type(self).__name__}(status_code={self.status_code}, detail={self.detail})'
+
+
+class RuntimeWebSocketException(Exception):
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+    def __str__(self) -> str:
+        return self.message
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}(message={self.message})'
