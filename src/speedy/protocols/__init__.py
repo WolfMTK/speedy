@@ -5,6 +5,7 @@ from .routing import BaseRoute
 from .endpoints import BaseHTTPEndpoint, BaseWebSocketEndpoint
 from .response import AbstractResponse
 from .request import HTTPConnection
+from .websocket import AbstractWebSocket
 
 __all__ = (
     'BaseASGIApplication',
@@ -14,5 +15,6 @@ __all__ = (
     'BaseHTTPEndpoint',
     'BaseWebSocketEndpoint',
     'AbstractResponse',
-    'HTTPConnection'
+    'HTTPConnection',
+    'AbstractWebSocket'
 )
