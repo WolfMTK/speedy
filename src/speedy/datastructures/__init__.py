@@ -1,7 +1,15 @@
 from .cookie import Cookie
-from .websocket import CloseWebSocket
+from .websocket import (
+    WebSocketCloseEvent,
+    WebSocketAcceptEvent,
+    WebSocketSendTextEvent,
+    WebSocketSendBytesEvent,
+)
 
 __all__ = (
     'Cookie',
-    'CloseWebSocket'
+    'WebSocketCloseEvent',
+    'WebSocketAcceptEvent',
+    'WebSocketSendTextEvent',
+    'WebSocketSendBytesEvent'
 )
