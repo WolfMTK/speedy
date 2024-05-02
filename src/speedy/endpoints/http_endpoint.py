@@ -4,9 +4,9 @@ from speedy.concurrence import sync_to_thread
 from speedy.constants import HTTP_METHODS
 from speedy.enums import ScopeType
 from speedy.exceptions import HTTPException
-from speedy.protocols import BaseHTTPEndpoint, AbstractResponse
-from speedy.requests import Request
-from speedy.response import PlainTextResponse
+from speedy.protocols import BaseHTTPEndpoint
+from speedy.request import Request
+from speedy.response import PlainTextResponse, ASGIResponse
 from speedy.status_code import HTTP_405_METHOD_NOT_ALLOWED
 from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable
 from speedy.utils import is_async_callable
@@ -36,7 +36,7 @@ class HTTPEndpoint(BaseHTTPEndpoint):
             response = await sync_to_thread(handler, request)
         await response(self.scope, self.receive, self.send)
 
-    async def method_not_allowed(self, request: Request) -> AbstractResponse:
+    async def method_not_allowed(self, request: Request) -> ASGIResponse:
         headers = {
             'Allow': ', '.join(self._get_allowed_methods())
         }

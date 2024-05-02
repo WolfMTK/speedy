@@ -18,4 +18,29 @@ class ScopeType(StrEnum):
 
 
 class MediaTextType(StrEnum):
-    plain = 'text/plain'
+    PLAIN = 'text/plain'
+
+
+class WebSocketState(StrEnum):
+    CONNECTING = 'connecting'
+    CONNECTED = 'connected'
+    DISCONNECTED = 'disconnected'
+    RESPONSE = 'response'
+
+
+class WebSocketStatusEvent(StrEnum):
+    START = 'websocket.http.response.start'
+    SEND = 'websocket.http.send'
+    SEND_EVENT = 'websocket.send'
+    ACCEPT = 'websocket.accept'
+    BODY = 'websocket.http.response.body'
+    CLOSE = 'websocket.close'
+    CONNECT = 'websocket.connect'
+    RECEIVE = 'websocket.receive'
+    DISCONNECT = 'websocket.disconnect'
+
+
+class WebSocketEncoding(StrEnum):
+    TEXT = 'text'
+    BYTES = 'bytes'
+    JSON = 'json'

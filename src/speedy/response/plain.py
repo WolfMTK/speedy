@@ -2,11 +2,11 @@ from typing import Any
 
 from speedy.enums import MediaTextType
 from speedy.protocols.background import AbstractBackground
-from speedy.response.base import ASGIBaseResponse
+from speedy.response.base import ASGIResponse
 from speedy.status_code import HTTP_200_OK
 
 
-class PlainTextResponse(ASGIBaseResponse):
+class PlainTextResponse(ASGIResponse):
     """ Response class with plain text passing. """
 
     def __init__(
@@ -17,5 +17,5 @@ class PlainTextResponse(ASGIBaseResponse):
             charset: str | None = None,
             background: None | AbstractBackground = None
     ) -> None:
-        media_type = MediaTextType.plain
+        media_type = MediaTextType.PLAIN
         super().__init__(content, status_code, headers, charset, media_type, background)

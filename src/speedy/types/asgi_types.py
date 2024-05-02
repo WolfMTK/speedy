@@ -258,6 +258,8 @@ type LifeSpanReceiveMessage = Union[
 
 type Scope = Union[HttpScope, WebSocketScope, LifespanScope]
 
+type Message = Union[HTTPReceiveMessage, WebSocketReceiveMessage]
+
 type ASGIReceiveEvent = Union[
     HTTPReceiveMessage,
     WebSocketReceiveMessage,
