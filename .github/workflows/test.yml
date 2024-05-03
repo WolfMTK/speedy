@@ -32,6 +32,6 @@ jobs:
           python -m pip install -e .[dev]
           python -m pip install -e .[linter]
       - name: "Run linting checks"
-        run: python -m mypy ./src
+        run: "python -m mypy ./src"
       - name: "Run tests"
         run: "python -m pytest"
