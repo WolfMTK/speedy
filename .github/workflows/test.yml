@@ -30,6 +30,8 @@ jobs:
       - name: "Install dependencies"
         run: "python -m pip install -e .[dev]"
       - name: "Run linting checks"
-        run: "python -m mypy ./src"
+        run: |
+          yes | python -m mypy --install-types ./src
+          python -m mypy ./src
       - name: "Run tests"
         run: "python -m pytest"
