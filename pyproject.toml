@@ -28,6 +28,7 @@ ujson = ["ujson<=5.9.0"]
 orjson = ["orjson<=3.10.2"]
 dev = [
     "pytest<=8.2.0",
+    "mypy<=1.10.0",
     "ujson<=5.9.0",
     "orjson<=3.10.2",
     "httpx<=0.27.0"
@@ -35,3 +36,8 @@ dev = [
 
 [project.urls]
 "Homepage" = "https://github.com/WolfMTK/speedy"
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
+strict_equality = false
