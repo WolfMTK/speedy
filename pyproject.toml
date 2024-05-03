@@ -1,12 +1,12 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=66.0"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-package-dir = { "" = "src" }
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [project]
-name = "Speedy"
+name = "speedy"
 version = "0.0.1"
 authors = [
     { name = "Alexander Kuzmin", email = "qrer71@yandex.ru" }
@@ -17,15 +17,21 @@ readme = "README.md"
 requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-dynamic = ["dependencies", "optional-dependencies"]
 
-[tool.setuptools.dynamic]
-dependencies = { file = ["requirements.txt"] }
-optional-dependencies = { dev = { file = ["requirements-dev.txt"] } }
+[project.optional-dependencies]
+ujson = ["ujson<=5.9.0"]
+orjson = ["orjson<=3.10.2"]
+dev = [
+    "pytest<=8.2.0",
+    "ujson<=5.9.0",
+    "orjson<=3.10.2",
+    "httpx<=0.27.0"
+]
 
 [project.urls]
 "Homepage" = "https://github.com/WolfMTK/speedy"
