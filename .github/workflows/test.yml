@@ -31,7 +31,7 @@ jobs:
         run: "python -m pip install -e .[dev]"
       - name: "Run linting checks"
         run: |
-          yes | python -m mypy --install-types ./src
+          python -m mypy --install-types ./src
           python -m mypy ./src
       - name: "Run tests"
         run: "python -m pytest"
