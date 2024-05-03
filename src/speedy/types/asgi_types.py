@@ -7,11 +7,12 @@ from typing import (
     Any,
     Callable,
     Awaitable,
+    TypeAlias,
 )
 
 from speedy.enums import HttpMethod, ScopeType
 
-type Method = Union[
+Method: TypeAlias = Union[
     Literal[
         'GET',
         'POST',
@@ -230,45 +231,45 @@ class LifespanShutdownFailedEvent(TypedDict):
     message: str
 
 
-type WebSocketReceiveEvent = Union[
+WebSocketReceiveEvent: TypeAlias = Union[
     _WebSocketReceiveEventBytes,
     _WebSocketReceiveEventText
 ]
 
-type WebSocketSendEvent = Union[
+WebSocketSendEvent: TypeAlias = Union[
     _WebSocketSendEventBytes,
     _WebSocketSendEventText
 ]
 
-type HTTPReceiveMessage = Union[
+HTTPReceiveMessage: TypeAlias = Union[
     HTTPRequestEvent,
     HTTPDisconnectEvent
 ]
 
-type WebSocketReceiveMessage = Union[
+WebSocketReceiveMessage: TypeAlias = Union[
     WebSocketConnectEvent,
     WebSocketReceiveEvent,
     WebSocketDisconnectEvent
 ]
 
-type LifeSpanReceiveMessage = Union[
+LifeSpanReceiveMessage: TypeAlias = Union[
     LifespanStartupEvent,
     LifespanShutdownEvent
 ]
 
-type Scope = Union[HttpScope, WebSocketScope, LifespanScope]
+Scope: TypeAlias = Union[HttpScope, WebSocketScope, LifespanScope]
 
-type Message = Union[HTTPReceiveMessage, WebSocketReceiveMessage]
+Message: TypeAlias = Union[HTTPReceiveMessage, WebSocketReceiveMessage]
 
-type ASGIReceiveEvent = Union[
+ASGIReceiveEvent: TypeAlias = Union[
     HTTPReceiveMessage,
     WebSocketReceiveMessage,
     LifeSpanReceiveMessage
 ]
 
-type ASGIReceiveCallable = Callable[[], Awaitable[ASGIReceiveEvent]]
+ASGIReceiveCallable: TypeAlias = Callable[[], Awaitable[ASGIReceiveEvent]]
 
-type HTTPSendMessage = Union[
+HTTPSendMessage: TypeAlias = Union[
     HTTPResponseStartEvent,
     HTTPResponseBodyEvent,
     HTTPResponseTrailersEvent,
@@ -276,7 +277,7 @@ type HTTPSendMessage = Union[
     HTTPDisconnectEvent
 ]
 
-type WebSocketSendMessage = Union[
+WebSocketSendMessage: TypeAlias = Union[
     WebSocketAcceptEvent,
     WebSocketSendEvent,
     WebSocketResponseStartEvent,
@@ -284,17 +285,17 @@ type WebSocketSendMessage = Union[
     WebSocketCloseEvent
 ]
 
-type LifeSpanSendMessage = Union[
+LifeSpanSendMessage: TypeAlias = Union[
     LifespanStartupCompleteEvent,
     LifespanStartupFailedEvent,
     LifespanShutdownCompleteEvent,
     LifespanShutdownFailedEvent
 ]
 
-type ASGISendEvent = Union[
+ASGISendEvent: TypeAlias = Union[
     HTTPSendMessage,
     WebSocketSendMessage,
     LifeSpanSendMessage
 ]
 
-type ASGISendCallable = Callable[[ASGISendEvent], Awaitable[None]]
+ASGISendCallable: TypeAlias = Callable[[ASGISendEvent], Awaitable[None]]

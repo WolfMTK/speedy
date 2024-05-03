@@ -1,7 +1,7 @@
 from typing import Never
 
 from speedy.enums import ScopeType
-from speedy.protocols import HTTPConnection
+from speedy.protocols import HTTPConnection, AbstractRequest
 from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable
 
 
@@ -13,12 +13,12 @@ async def empty_send() -> Never:
     raise RuntimeError('Send channel has not been made available')
 
 
-class Request(HTTPConnection):
+class Request(AbstractRequest, HTTPConnection):
     def __init__(
             self,
             scope: Scope,
             receive: ASGIReceiveCallable = empty_receive,
-            send: ASGISendCallable = empty_send
+            send: ASGISendCallable = empty_send  # type: ignore
     ) -> None:
         assert scope['type'] == ScopeType.HTTP
 

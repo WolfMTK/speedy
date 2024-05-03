@@ -1,7 +1,7 @@
-from typing import Callable, Awaitable
+from typing import Callable, Awaitable, TypeAlias
 
 from .asgi_types import Scope, ASGIReceiveCallable, ASGISendCallable
 
-type ASGIApplication = Callable[
+ASGIApplication: TypeAlias = Callable[
     [Scope, ASGIReceiveCallable, ASGISendCallable], Awaitable[None]
 ]

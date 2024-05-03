@@ -13,7 +13,7 @@ class Middleware:
 
     def __init__(
             self,
-            cls: type(BaseMiddleware),
+            cls: type[BaseMiddleware[P]],
             *args: P.args,
             **kwargs: P.kwargs
     ) -> None:

@@ -10,12 +10,12 @@ from speedy.datastructures import (
 )
 from speedy.enums import ScopeType, WebSocketState, WebSocketStatusEvent, WebSocketEncoding
 from speedy.exceptions import RuntimeWebSocketException, WebSocketDisconnect
-from speedy.protocols import HTTPConnection
+from speedy.protocols import HTTPConnection, AbstractWebSocket
 from speedy.status_code import WS_1000_NORMAL_CLOSURE, WS_1006_ABNORMAL_CLOSURE
 from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable, Message
 
 
-class WebSocket(HTTPConnection):
+class WebSocket(AbstractWebSocket, HTTPConnection):
     def __init__(
             self,
             scope: Scope,
@@ -31,11 +31,11 @@ class WebSocket(HTTPConnection):
         self._application_state = WebSocketState.CONNECTING
 
     @property
-    def client_state(self):
+    def client_state(self) -> str:
         return self._client_state
 
     @property
-    def application_state(self):
+    def application_state(self) -> str:
         return self._application_state
 
     async def send(self, message: Message) -> None:
@@ -54,11 +54,11 @@ class WebSocket(HTTPConnection):
 
     async def send_text(self, data: str) -> None:
         """ Send text in a websocket messages. """
-        await self.send(vars(WebSocketSendTextEvent(text=data)))
+        await self.send(vars(WebSocketSendTextEvent(text=data)))  # type: ignore[arg-type]
 
-    async def send_bytes(self, data: bytes):
+    async def send_bytes(self, data: bytes) -> None:
         """ Send bytes in a websocket messages. """
-        await self.send(vars(WebSocketSendBytesEvent(bytes=data)))
+        await self.send(vars(WebSocketSendBytesEvent(bytes=data)))  # type: ignore[arg-type]
 
     async def send_json(self, data: Any, mode: str = 'text', json_library: str = 'json') -> None:
         """ Send json in a websocket messages.
@@ -99,7 +99,7 @@ class WebSocket(HTTPConnection):
             )
         message = await self.receive()
         self._raise_on_disconnect(message)
-        return cast(str, message[WebSocketEncoding.TEXT])
+        return cast(str, message['WebSocketEncoding.TEXT'])  # type: ignore[typeddict-item]
 
     async def receive_bytes(self) -> bytes:
         """ Receive bytes from a websocket messages. """
@@ -109,7 +109,7 @@ class WebSocket(HTTPConnection):
             )
         message = await self.receive()
         self._raise_on_disconnect(message)
-        return cast(bytes, message[WebSocketEncoding.BYTES])
+        return cast(bytes, message[WebSocketEncoding.BYTES])  # type: ignore[typeddict-item]
 
     async def receive_json(
             self,
@@ -137,10 +137,12 @@ class WebSocket(HTTPConnection):
         message = await self.receive()
         self._raise_on_disconnect(message)
 
-        if (text := message.get(WebSocketEncoding.BYTES)) is not None:
-            text = text.decode('utf-8')
+        if (
+                text := message.get(WebSocketEncoding.BYTES)
+        ) is not None:
+            text = text.decode('utf-8')  # type: ignore[attr-defined]
         else:
-            text = message[WebSocketEncoding.TEXT]
+            text = message[WebSocketEncoding.TEXT]  # type: ignore[typeddict-item]
         return self._receive_json(cast(str, text), json_library)
 
     async def accept(
@@ -152,7 +154,9 @@ class WebSocket(HTTPConnection):
         if self.client_state == WebSocketState.CONNECTING:
             # Waiting for connection
             await self.receive()
-        await self._send(vars(self._accept_websocket(subprotocol, headers)))
+        await self._send(
+            vars(self._accept_websocket(subprotocol, headers))  # type: ignore[arg-type]
+        )
 
     async def close(
             self,
@@ -160,7 +164,7 @@ class WebSocket(HTTPConnection):
             reason: str | None = None
     ) -> None:
         """ Close the connection. """
-        await self._send(vars(self._close_websocket(code, reason)))
+        await self._send(vars(self._close_websocket(code, reason)))  # type: ignore[arg-type]
 
     async def _send_is_connecting(self, message: Message) -> None:
         type_message = message['type']
@@ -180,7 +184,7 @@ class WebSocket(HTTPConnection):
                 self._application_state = WebSocketState.RESPONSE
             case _:
                 self._application_state = WebSocketState.CONNECTED
-        await self._send(message)
+        await self._send(message)  # type: ignore[arg-type]
 
     async def _send_is_connected(self, message: Message) -> None:
         type_message = message['type']
@@ -193,7 +197,7 @@ class WebSocket(HTTPConnection):
         if type_message == WebSocketStatusEvent.CLOSE:
             self._application_state = WebSocketState.DISCONNECTED
         try:
-            await self._send(message)
+            await self._send(message)  # type: ignore[arg-type]
         except OSError:
             self._application_state = WebSocketState.DISCONNECTED
             raise WebSocketDisconnect(code=WS_1006_ABNORMAL_CLOSURE)
@@ -217,7 +221,7 @@ class WebSocket(HTTPConnection):
                 f'Expected ASGI message "websocket.connect", but got {type_message}'
             )
         self._client_state = WebSocketState.CONNECTED
-        return message
+        return cast(Message, message)
 
     async def _receive_is_connected(self) -> Message:
         message = await self._receive()
@@ -231,9 +235,9 @@ class WebSocket(HTTPConnection):
 
         if type_message == WebSocketStatusEvent.DISCONNECT:
             self._client_state = WebSocketState.DISCONNECTED
-        return message
+        return cast(Message, message)
 
-    def _raise_on_disconnect(self, message: Message):
+    def _raise_on_disconnect(self, message: Message) -> None:
         if message['type'] == WebSocketStatusEvent.DISCONNECT:
             raise WebSocketDisconnect(
                 cast(int, message['code']),
