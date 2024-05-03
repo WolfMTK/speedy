@@ -23,14 +23,14 @@ class ASGIResponse(AbstractResponse):
             charset = 'utf-8'
         self.charset = charset
         self.body = self.render(content)
-        self.raw_headers: list = []
+        self.raw_headers: list[Any] = []
 
     def render(self, content: Any) -> bytes:
         if content is None:
             return b''
         if isinstance(content, bytes):
             return content
-        return content.encode(self.charset)
+        return content.encode(self.charset)  # type: ignore
 
     async def __call__(
             self,
@@ -38,17 +38,19 @@ class ASGIResponse(AbstractResponse):
             receive: ASGIReceiveCallable,
             send: ASGISendCallable
     ) -> None:
-        prefix = 'websocket.' if scope['type'] == 'websocket' else ''
-        await send(
-            {
-                'type': prefix + 'http.response.start',
-                'status': self.status_code,
-                'headers': self.raw_headers
-            }
-        )
-        await send(
-            {
-                'type': prefix + 'http.response.start',
-                'body': self.body
-            }
-        )
+        # TODO: Replace with structures
+        # prefix = 'websocket.' if scope['type'] == 'websocket' else ''
+        # await send(
+        #     {
+        #         'type': prefix + 'http.response.start',
+        #         'status': self.status_code,
+        #         'headers': self.raw_headers
+        #     }
+        # )
+        # await send(
+        #     {
+        #         'type': prefix + 'http.response.start',
+        #         'body': self.body
+        #     }
+        # )
+        ...

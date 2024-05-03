@@ -1,7 +1,7 @@
 import asyncio
 from typing import TypeVar, ParamSpec, Callable, TypeGuard, Awaitable
 
-from .helpers import unwrap_partial
+from speedy.utils.helpers import unwrap_partial
 
 P = ParamSpec('P')
 T = TypeVar('T')
@@ -14,5 +14,5 @@ def is_async_callable(
 
     return asyncio.iscoroutinefunction(obj) or (
             callable(obj) and
-            asyncio.iscoroutinefunction(obj.__call__)  # type: ignore
+            asyncio.iscoroutinefunction(obj.__call__)  # type: ignore[operator]
     )

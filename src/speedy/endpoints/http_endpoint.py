@@ -1,12 +1,13 @@
+from collections.abc import Iterator
 from typing import Callable, Any
 
 from speedy.concurrence import sync_to_thread
 from speedy.constants import HTTP_METHODS
 from speedy.enums import ScopeType
 from speedy.exceptions import HTTPException
-from speedy.protocols import BaseHTTPEndpoint
+from speedy.protocols import BaseHTTPEndpoint, AbstractResponse, AbstractRequest
 from speedy.request import Request
-from speedy.response import PlainTextResponse, ASGIResponse
+from speedy.response import PlainTextResponse
 from speedy.status_code import HTTP_405_METHOD_NOT_ALLOWED
 from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable
 from speedy.utils import is_async_callable
@@ -36,7 +37,7 @@ class HTTPEndpoint(BaseHTTPEndpoint):
             response = await sync_to_thread(handler, request)
         await response(self.scope, self.receive, self.send)
 
-    async def method_not_allowed(self, request: Request) -> ASGIResponse:
+    async def method_not_allowed(self, request: AbstractRequest) -> AbstractResponse:
         headers = {
             'Allow': ', '.join(self._get_allowed_methods())
         }
@@ -48,12 +49,12 @@ class HTTPEndpoint(BaseHTTPEndpoint):
             headers=headers
         )
 
-    def _get_name_handler(self, request: Request) -> str:
+    def _get_name_handler(self, request: AbstractRequest) -> str:
         if request.method == 'HEAD' and not hasattr(self, 'head'):
             return 'get'
         return request.method.lower()
 
-    def _get_allowed_methods(self):
+    def _get_allowed_methods(self) -> Iterator[str]:
         for method in HTTP_METHODS:
             if getattr(self, method.lower(), None) is not None:
                 yield method

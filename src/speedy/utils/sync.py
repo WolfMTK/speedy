@@ -1,4 +1,5 @@
-from typing import TypeVar, ParamSpec, Callable, Awaitable
+from collections.abc import Callable, Awaitable
+from typing import TypeVar, ParamSpec
 
 from speedy.concurrence import sync_to_thread
 

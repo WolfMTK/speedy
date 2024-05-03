@@ -1,13 +1,13 @@
-from collections.abc import Mapping
-from typing import Any
+from abc import ABC, abstractmethod
+
+from speedy.types import ASGIReceiveCallable
 
 
-class HTTPConnection(Mapping[str, Any]):
-    def __getitem__(self, item):
-        return self.scope[item]
+class AbstractRequest(ABC):
+    @property
+    @abstractmethod
+    def method(self) -> str: ...
 
-    def __iter__(self):
-        return iter(self.scope)
-
-    def __len__(self):
-        return len(self.scope)
+    @property
+    @abstractmethod
+    def receive(self) -> ASGIReceiveCallable: ...

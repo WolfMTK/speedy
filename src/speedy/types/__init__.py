@@ -1,7 +1,6 @@
 from .application_types import ASGIApplication
 from .asgi_types import (
     ASGIVersions,
-    HttpMethod,
     HttpScope,
     WebSocketScope,
     LifespanScope,
@@ -13,7 +12,6 @@ from .asgi_types import (
 
 __all__ = (
     'ASGIVersions',
-    'HttpMethod',
     'HttpScope',
     'WebSocketScope',
     'LifespanScope',
