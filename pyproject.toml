@@ -33,6 +33,10 @@ dev = [
     "orjson<=3.10.2",
     "httpx<=0.27.0"
 ]
+linter = [
+    "mypy<=1.10.0",
+    "types-ujson<=5.9.0"
+]
 
 [project.urls]
 "Homepage" = "https://github.com/WolfMTK/speedy"
