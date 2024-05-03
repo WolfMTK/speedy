@@ -1,7 +1,7 @@
 from collections.abc import Callable, Awaitable
 from typing import TypeVar, ParamSpec
 
-from speedy.concurrence import sync_to_thread
+from speedy.concurrency import sync_to_thread
 
 P = ParamSpec('P')
 T = TypeVar('T')
