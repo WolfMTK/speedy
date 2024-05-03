@@ -33,7 +33,7 @@ jobs:
           python -m pip install -e .[linter]
       - name: "Run linting checks"
         run: |
-          yes | python -m mypy --install-types ./src
+          python -m mypy --install-types ./src
           python -m mypy ./src
       - name: "Run tests"
         run: "python -m pytest"
