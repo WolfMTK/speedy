@@ -5,11 +5,13 @@ from .websocket import (
     WebSocketSendTextEvent,
     WebSocketSendBytesEvent,
 )
+from .url import URL
 
 __all__ = (
     'Cookie',
     'WebSocketCloseEvent',
     'WebSocketAcceptEvent',
     'WebSocketSendTextEvent',
-    'WebSocketSendBytesEvent'
+    'WebSocketSendBytesEvent',
+    'URL'
 )
