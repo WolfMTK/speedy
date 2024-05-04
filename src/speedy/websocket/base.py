@@ -60,7 +60,13 @@ class WebSocket(AbstractWebSocket, HTTPConnection):
         """ Send bytes in a websocket messages. """
         await self.send(vars(WebSocketSendBytesEvent(bytes=data)))  # type: ignore[arg-type]
 
-    async def send_json(self, data: Any, mode: str = 'text', json_library: str = 'json') -> None:
+    async def send_json(
+            self,
+            data: Any,
+            mode: str = 'text',
+            *,
+            json_library: str = 'json'
+    ) -> None:
         """ Send json in a websocket messages.
 
         mode: text | bytes
@@ -114,6 +120,7 @@ class WebSocket(AbstractWebSocket, HTTPConnection):
     async def receive_json(
             self,
             mode: str = WebSocketEncoding.TEXT,
+            *,
             json_library: str = 'json'
     ) -> Any:
         """
