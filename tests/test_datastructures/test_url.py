@@ -13,6 +13,9 @@ def test_url() -> None:
     assert url.query == 'abc=123'
     assert url.fragment == "anchor"
 
+
+def test_url_replace() -> None:
+    url = URL('https://example.org:8000/path/to/somewhere?abc=123#anchor')
     new_url = url.replace(scheme='http')
     assert new_url == 'http://example.org:8000/path/to/somewhere?abc=123#anchor'
     assert new_url.scheme == 'http'
@@ -25,6 +28,8 @@ def test_url() -> None:
     assert new_url == 'https://example.com:8000/path/to/somewhere?abc=123#anchor'
     assert new_url.hostname == 'example.com'
 
+
+def test_ipb6_url_replace() -> None:
     ipv6_url = URL('https://[fe::2]:12345')
     new_url = ipv6_url.replace(port=8000)
     assert new_url == 'https://[fe::2]:8000'
@@ -37,6 +42,8 @@ def test_url() -> None:
     new_url = ipv6_url.replace(port=8000)
     assert new_url == 'https://[fe::2]:8000'
 
+
+def test_url_eq() -> None:
     url = URL('http://u:p@host/')
     assert url.replace(hostname='bar') == URL('http://u:p@bar/')
 
@@ -45,3 +52,8 @@ def test_url() -> None:
 
     url = URL('http://host:80')
     assert url.replace(username='u') == URL('http://u@host:80')
+
+
+def test_url_repr() -> None:
+    url = URL('https://example.org:8000/path/to/somewhere?abc=123#anchor')
+    assert repr(url) == "URL('https://example.org:8000/path/to/somewhere?abc=123#anchor')"
