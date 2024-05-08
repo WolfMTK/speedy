@@ -22,6 +22,9 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+dependencies = [
+    "multidict<=6.0.5",
+]
 
 [project.optional-dependencies]
 ujson = ["ujson<=5.9.0"]
