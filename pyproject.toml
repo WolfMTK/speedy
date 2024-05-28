@@ -27,18 +27,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ujson = ["ujson<=5.9.0"]
+ujson = ["ujson<=5.10.0"]
 orjson = ["orjson<=3.10.3"]
 dev = [
-    "pytest<=8.2.0",
+    "pytest<=8.2.1",
     "mypy<=1.10.0",
-    "ujson<=5.9.0",
+    "ujson<=5.10.0",
     "orjson<=3.10.3",
     "httpx<=0.27.0"
 ]
 linter = [
     "mypy<=1.10.0",
-    "types-ujson<=5.9.0"
+    "types-ujson<=5.10.0.20240515"
 ]
 
 [project.urls]
