@@ -6,7 +6,7 @@ P = ParamSpec('P')
 
 
 class Middleware:
-    def __init__(self, cls: type[MiddlewareProtocol[P]], *args: P.args, **kwargs: P.kwargs) -> None:
+    def __init__(self, cls: type[MiddlewareProtocol], *args: P.args, **kwargs: P.kwargs) -> None:
         self.cls = cls
         self.args = args
         self.kwargs = kwargs
