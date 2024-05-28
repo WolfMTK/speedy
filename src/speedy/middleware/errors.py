@@ -5,10 +5,7 @@ from speedy.types.application import ASGIAppType
 
 
 class ServerErrorMiddleware(BaseMiddleware):
-    def __init__(
-            self,
-            app: ASGIAppType,
-    ) -> None:
+    def __init__(self, app: ASGIAppType) -> None:
         self.app = app
         self.started_response = False
 
