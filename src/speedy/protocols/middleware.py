@@ -7,7 +7,7 @@ P = ParamSpec('P')
 
 
 @runtime_checkable
-class MiddlewareProtocol(Protocol[P]):
+class MiddlewareProtocol(Protocol):
     async def __call__(self, scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable) -> None: ...
 
 
