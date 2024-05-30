@@ -122,42 +122,52 @@ class URL:
 
     @property
     def scheme(self) -> str:
+        """ scheme in the URL. """
         return self.url_components.scheme
 
     @property
     def hostname(self) -> str | None:
+        """ hostname in the URL. """
         return self.url_components.hostname
 
     @property
     def port(self) -> int | None:
+        """ port in the URL. """
         return self.url_components.port
 
     @property
     def netloc(self) -> str:
+        """ netloc in the URL. """
         return self.url_components.netloc
 
     @property
     def username(self) -> str | None:
+        """ username in the URL. """
         return self.url_components.username
 
     @property
     def password(self) -> str | None:
+        """ password in the URL. """
         return self.url_components.password
 
     @property
     def path(self) -> str:
+        """ path in the URL. """
         return self.url_components.path
 
     @property
     def query(self) -> str:
+        """ query in the URL. """
         return self.url_components.query
 
     @property
     def fragment(self) -> str:
+        """ fragment in the URL. """
         return self.url_components.fragment
 
     @property
     def components(self) -> SplitResult:
+        """ components in the URL. """
         if not hasattr(self, '_components'):
             self._components = urlsplit(self._url)
         return self._components
@@ -179,6 +189,7 @@ class URL:
         return self._parser_url
 
     def replace_query(self, **kwargs: Any) -> Self:
+        """ Replace the query string in the URL. """
         query = urlencode([(str(key), str(value)) for key, value in kwargs.items()])
         components = self.components._replace(query=query)
         return type(self)._new(components.geturl())
