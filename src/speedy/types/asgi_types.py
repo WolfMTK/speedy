@@ -28,12 +28,23 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-from typing import Union, Literal, TypedDict, Iterable, NotRequired, Any, Callable, Awaitable, TypeAlias
+from typing import (
+    Union,
+    Literal,
+    TypedDict,
+    Iterable,
+    NotRequired,
+    Any,
+    Callable,
+    Awaitable,
+    TypeAlias,
+    TypeVar,
+)
 
 from speedy.enums import HttpMethod, ScopeType
-from speedy.protocols.application import ASGIApplication
 
 Method: TypeAlias = Union[Literal['GET', 'POST', 'DELETE', 'PATCH', 'PUT', 'HEAD', 'TRACE', 'OPTIONS'], HttpMethod]
+ASGIApplication = TypeVar('ASGIApplication')
 
 Version = Literal['2.0'] | Literal['3.0']
 
@@ -48,7 +59,7 @@ class ASGIVersions(TypedDict):
 class BaseScope(TypedDict):
     """ Base ASGI-scope. """
 
-    app: ASGIApplication
+    app: ASGIApplication  # type: ignore[valid-type]
     asgi: ASGIVersions
     http_version: str
     scheme: str
@@ -80,7 +91,7 @@ class WebSocketScope(BaseScope):
 class LifespanScope(TypedDict):
     """ Lifespan-ASGI-scope. """
 
-    app: ASGIApplication
+    app: ASGIApplication  # type: ignore[valid-type]
     type: Literal[ScopeType.LIFESPAN]
     asgi: ASGIVersions
     state: NotRequired[dict[str, Any]]
@@ -270,7 +281,7 @@ LifeSpanReceiveMessage: TypeAlias = Union[
     LifespanShutdownEvent
 ]
 
-Scope: TypeAlias = Union[HttpScope, WebSocketScope, LifespanScope]
+Scope: TypeAlias = Union[HttpScope, WebSocketScope]
 
 Message: TypeAlias = Union[HTTPReceiveMessage, WebSocketReceiveMessage]
 
