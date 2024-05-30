@@ -1,12 +1,12 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=66.0"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-package-dir = { "" = "src" }
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [project]
-name = "Speedy"
+name = "speedy"
 version = "0.0.1"
 authors = [
     { name = "Alexander Kuzmin", email = "qrer71@yandex.ru" }
@@ -45,9 +45,6 @@ linter = [
 "Homepage" = "https://github.com/WolfMTK/speedy"
 
 [tool.mypy]
-python_version = "3.12"
 strict = true
 ignore_missing_imports = true
 strict_equality = false
-enable_error_code = "ignore-without-code"
-implicit_reexport = false

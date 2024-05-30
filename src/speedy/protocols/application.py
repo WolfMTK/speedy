@@ -1,12 +1,14 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 
 from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable
-from speedy.types.application import ASGIAppType
 
 
-class ASGIApplication(ABC):
-    @abstractmethod
-    async def __call__(self, scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable) -> None: ...
+class BaseASGIApplication(ABC):
+    """ Base ASGI application protocol. """
 
-    @abstractmethod
-    def build_middleware_stack(self) -> ASGIAppType: ...
+    async def __call__(
+            self,
+            scope: Scope,
+            receive: ASGIReceiveCallable,
+            send: ASGISendCallable
+    ) -> None: ...

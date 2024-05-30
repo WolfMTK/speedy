@@ -15,7 +15,6 @@ class HttpMethod(StrEnum):
 class ScopeType(StrEnum):
     HTTP = 'http'
     WEBSOCKET = 'websocket'
-    LIFESPAN = 'lifespan'
 
 
 class MediaTextType(StrEnum):

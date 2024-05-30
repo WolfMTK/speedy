@@ -1,16 +1,28 @@
-from abc import ABC, abstractmethod
-from typing import Protocol, runtime_checkable, ParamSpec
-
-from speedy.types import ASGISendCallable, ASGIReceiveCallable, Scope
+from typing import Protocol, ParamSpec
+from speedy.types import (
+    Scope,
+    ASGIReceiveCallable,
+    ASGISendCallable,
+    ASGIApplication,
+)
 
 P = ParamSpec('P')
 
 
-@runtime_checkable
-class MiddlewareProtocol(Protocol):
-    async def __call__(self, scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable) -> None: ...
+class BaseMiddleware(Protocol[P]):
+    """ Abstract middleware protocol. """
 
+    __slots__ = ('app', 'args', 'kwargs')
 
-class BaseMiddleware(ABC):
-    @abstractmethod
-    async def __call__(self, scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable) -> None: ...
+    def __init__(
+            self,
+            app: ASGIApplication,
+            *args: P.args,
+            **kwargs: P.kwargs
+    ) -> None: ...
+
+    async def __call__(
+            self, scope: Scope,
+            receive: ASGIReceiveCallable,
+            send: ASGISendCallable
+    ) -> None: ...
