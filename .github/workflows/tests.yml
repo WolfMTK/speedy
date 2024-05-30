@@ -30,8 +30,9 @@ jobs:
       - name: "Install dependencies"
         run: | 
           python -m pip install -e .[dev]
-          python -m pip install -e .[linter]
-      - name: "Run linting checks"
-        run: "python -m mypy ./src"
+# TODO: Add a linter after creating the application
+#          python -m pip install -e .[linter]
+#      - name: "Run linting checks"
+#        run: "python -m mypy ./src"
       - name: "Run tests"
         run: "python -m pytest"
