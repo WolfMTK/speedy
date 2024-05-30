@@ -3,7 +3,9 @@ from functools import lru_cache
 from typing import NamedTuple, Self, Any
 from urllib.parse import SplitResult, urlsplit, urlunsplit, urlencode
 
+from speedy._parsers import parse_query_string
 from speedy.types.asgi_types import Scope
+from .multi_dicts import MultiDict
 
 
 class Address(NamedTuple):
@@ -190,6 +192,16 @@ class URL:
 
     def replace_query(self, **kwargs: Any) -> Self:
         """ Replace the query string in the URL. """
-        query = urlencode([(str(key), str(value)) for key, value in kwargs.items()])
+        query = urlencode(tuple((str(key), str(value)) for key, value in kwargs.items()))
+        return self._replace_query(query)
+
+    def include_query_params(self, **kwargs: Any) -> Self:
+        """ Include query parameters in the URL. """
+        query_params = MultiDict(parse_query_string(query=self.query.encode()))
+        query_params.update({str(key): str(value) for key, value in kwargs.items()})
+        query = urlencode(list(query_params.multi_items()))
+        return self._replace_query(query)
+
+    def _replace_query(self, query: str) -> Self:
         components = self.components._replace(query=query)
         return type(self)._new(components.geturl())
