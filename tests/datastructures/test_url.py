@@ -33,3 +33,14 @@ def test_url_replace_query() -> None:
     assert url.query == 'order=name'
     url = URL('https://example.org/path/to?a=1&b=2')
     assert url.query == 'a=1&b=2'
+
+
+def test_url_include_query_params() -> None:
+    url = URL('https://example.org/path/to?a=1')
+    assert url.query == 'a=1'
+    url = url.include_query_params(a=2)
+    assert url.query == 'a=2'
+    assert str(url) == 'https://example.org/path/to?a=2'
+    url = url.include_query_params(search='test')
+    assert url.query == 'a=2&search=test'
+    assert str(url) == 'https://example.org/path/to?a=2&search=test'
