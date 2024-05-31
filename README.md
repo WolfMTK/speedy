@@ -1,2 +1,5 @@
-# Speedy
-Speedy is a web framework that is currently under development
+# speedy
+In development
+
+# !!!WARNING!!!
+Description and documentation will be added after the functional is added
