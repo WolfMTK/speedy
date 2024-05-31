@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import NamedTuple, Self, Any
+from typing import NamedTuple, Self, Any, Sequence
 from urllib.parse import SplitResult, urlsplit, urlunsplit, urlencode
 
 from speedy._parsers import parse_query_string
@@ -20,6 +20,8 @@ _DEFAULT_SCHEMA_PORTS = {'http': 80, 'https': 443, 'ws': 80, 'wss': 443}
 
 @dataclass
 class URLComponents:
+    """ Components in the URL. """
+
     scheme: str = ''
     netloc: str = ''
     path: str = ''
@@ -190,8 +192,8 @@ class URL:
             )
         return self._parser_url
 
-    def replace_query(self, **kwargs: Any) -> Self:
-        """ Replace the query string in the URL. """
+    def replace_query_params(self, **kwargs: Any) -> Self:
+        """ Replace query parameters in the URL. """
         query = urlencode(tuple((str(key), str(value)) for key, value in kwargs.items()))
         return self._replace_query(query)
 
@@ -199,6 +201,16 @@ class URL:
         """ Include query parameters in the URL. """
         query_params = MultiDict(parse_query_string(query=self.query.encode()))
         query_params.update({str(key): str(value) for key, value in kwargs.items()})
+        query = urlencode(list(query_params.multi_items()))
+        return self._replace_query(query)
+
+    def remove_query_params(self, keys: str | Sequence[str]) -> Self:
+        """ Remove query parameters in the URL. """
+        if isinstance(keys, str):
+            keys = [keys]
+        query_params = MultiDict(parse_query_string(query=self.query.encode()))
+        for key in keys:
+            query_params.pop(key, None)
         query = urlencode(list(query_params.multi_items()))
         return self._replace_query(query)
 
