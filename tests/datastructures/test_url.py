@@ -113,3 +113,12 @@ def test_url_include_query_params() -> None:
     url = url.include_query_params(search='test')
     assert url.query == 'a=2&search=test'
     assert str(url) == 'https://example.org/path/to?a=2&search=test'
+
+
+def test_hidden_password() -> None:
+    url = URL('https://example.org/path/to?a=1')
+    assert repr(url) == "URL('https://example.org/path/to?a=1')"
+    url = URL('https://username@example.org/path/to?a=1')
+    assert repr(url) == "URL('https://username@example.org/path/to?a=1')"
+    url = URL('https://username:password@example.org/path/to?a=1')
+    assert repr(url) == "URL('https://username:**********@example.org/path/to?a=1')"
