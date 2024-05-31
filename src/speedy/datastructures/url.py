@@ -51,7 +51,10 @@ class URL:
         return self._url
 
     def __repr__(self) -> str:
-        return f'{type(self).__name__}({self._url!r})'
+        url = self._url
+        if self.password is not None:
+            url = self.replace(password='**********')._url
+        return f'{type(self).__name__}({url!r})'
 
     @classmethod
     def from_scope(cls, scope: Scope) -> Self:
