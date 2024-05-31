@@ -214,6 +214,54 @@ class URL:
         query = urlencode(list(query_params.multi_items()))
         return self._replace_query(query)
 
+    def replace(self, **kwargs: Any) -> Self:
+        """ Replace components in the URL. """
+        url_components = URLComponents(**kwargs)
+        netloc = self._get_netloc(**kwargs)
+        if netloc != '':
+            url_components.netloc = netloc
+            kwargs['netloc'] = netloc
+        for key, value in vars(self.url_components).items():
+            if key in kwargs:
+                continue
+            setattr(url_components, key, value)
+        return type(self)._new(
+            SplitResult(
+                scheme=url_components.scheme,
+                netloc=url_components.netloc,
+                path=url_components.path,
+                fragment=url_components.fragment,
+                query=url_components.query
+            )
+        )
+
+    def _get_netloc(self, **kwargs: Any) -> str:
+        netloc = ''
+        if ('username' in kwargs
+                or 'password' in kwargs
+                or 'hostname' in kwargs
+                or 'port' in kwargs):
+            hostname = kwargs.pop('hostname', None)
+            port = kwargs.pop('port', self.port)
+            username = kwargs.pop('username', self.username)
+            password = kwargs.pop('password', self.password)
+
+            if hostname is None:
+                netloc = self.netloc
+                _, _, hostname = netloc.rpartition('@')
+                if hostname[-1] != ']':
+                    hostname = hostname.rsplit(':', 1)[0]
+            netloc = hostname
+            if port is not None:
+                netloc += f':{port}'
+
+            if username is not None:
+                userpass = username
+                if password is not None:
+                    userpass += f':{password}'
+                netloc = f'{userpass}@{netloc}'
+        return netloc
+
     def _replace_query(self, query: str) -> Self:
         components = self.components._replace(query=query)
         return type(self)._new(components.geturl())
