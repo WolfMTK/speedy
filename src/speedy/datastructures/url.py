@@ -63,6 +63,7 @@ class URL:
         server = scope.get('server', None)
         path = scope['path']
         query_string = scope.get('query_string', b'')
+        url = ''
 
         host_header = None
         for key, value in scope['headers']:
@@ -70,23 +71,21 @@ class URL:
                 host_header = value.decode('latin-1')
                 break
 
-        if server and not host_header:
+        if host_header is not None:
+            url = f'{scheme}://{host_header}{path}'
+        elif server is None:
+            url = path
+        else:
             host, port = server
             default_port = _DEFAULT_SCHEMA_PORTS[scheme]
-            if port != default_port:
-                host_header = f'{host}:{port}'
+            if port == default_port:
+                url = f'{scheme}://{host}{path}'
+            else:
+                url = f'{scheme}://{host}:{port}{path}'
 
-        if not server:
-            scheme = ''
-
-        return cls.from_components(
-            URLComponents(
-                scheme=scheme,
-                query=query_string.decode(),
-                netloc=host_header,  # type: ignore[arg-type]
-                path=path
-            )
-        )
+        if query_string:
+            url += '?' + query_string.decode()
+        return cls(url)
 
     @classmethod
     @lru_cache

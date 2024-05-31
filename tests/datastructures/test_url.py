@@ -61,41 +61,41 @@ def test_from_components(component: str, value: str) -> None:
 def test_replace() -> None:
     url = URL('https://example.org:8000/path/to/somewhere?abc=123#anchor')
     new_url = url.replace(scheme='http')
-    assert str(new_url) == 'http://example.org:8000/path/to/somewhere?abc=123#anchor'
+    assert new_url == 'http://example.org:8000/path/to/somewhere?abc=123#anchor'
     assert new_url.scheme == 'http'
 
     new_url = url.replace(port=None)
-    assert str(new_url) == 'https://example.org/path/to/somewhere?abc=123#anchor'
+    assert new_url == 'https://example.org/path/to/somewhere?abc=123#anchor'
     assert new_url.port is None
 
     new_url = url.replace(hostname='example.com')
-    assert str(new_url) == 'https://example.com:8000/path/to/somewhere?abc=123#anchor'
+    assert new_url == 'https://example.com:8000/path/to/somewhere?abc=123#anchor'
     assert new_url.hostname == 'example.com'
 
     ipv6_url = URL('https://[fe::2]:12345')
     new_ipv6_url = ipv6_url.replace(port=8000)
-    assert str(new_ipv6_url) == 'https://[fe::2]:8000'
+    assert new_ipv6_url == 'https://[fe::2]:8000'
     assert new_ipv6_url.port == 8000
 
     new_ipv6_url = ipv6_url.replace(username='username', password='password')
-    assert str(new_ipv6_url) == 'https://username:password@[fe::2]:12345'
+    assert new_ipv6_url == 'https://username:password@[fe::2]:12345'
     assert new_ipv6_url.netloc == 'username:password@[fe::2]:12345'
     assert new_ipv6_url.username == 'username'
     assert new_ipv6_url.password == 'password'
 
     ipv6_url = URL('https://[fe::2]')
     new_ipv6_url = ipv6_url.replace(port=8000)
-    assert str(new_ipv6_url) == 'https://[fe::2]:8000'
+    assert new_ipv6_url == 'https://[fe::2]:8000'
     assert new_ipv6_url.port == 8000
 
     url = URL('http://u:p@host/')
     new_url = url.replace(hostname='foo')
-    assert str(new_url) == 'http://u:p@foo/'
+    assert new_url == 'http://u:p@foo/'
     assert new_url.hostname == 'foo'
 
     url = URL('http://host:80')
     new_url = url.replace(username='user')
-    assert str(new_url) == 'http://user@host:80'
+    assert new_url == 'http://user@host:80'
 
 
 def test_url_eq() -> None:
@@ -113,7 +113,7 @@ def test_url_replace_query_params() -> None:
     url = URL('https://example.org:8000/path/to/somewhere?abc=123#anchor')
     assert url.query == 'abc=123'
     url = url.replace_query_params(order='name')
-    assert str(url) == 'https://example.org:8000/path/to/somewhere?order=name#anchor'
+    assert url == 'https://example.org:8000/path/to/somewhere?order=name#anchor'
     assert url.query == 'order=name'
 
 
@@ -121,11 +121,11 @@ def test_url_remove_query_params() -> None:
     url = URL('https://example.org/path/to?a=1&b=2')
     assert url.query == 'a=1&b=2'
     url = url.remove_query_params('a')
-    assert str(url) == 'https://example.org/path/to?b=2'
+    assert url == 'https://example.org/path/to?b=2'
     assert url.query == 'b=2'
     url = URL('https://example.org/path/to?a=1&b=2&c=3')
     url = url.remove_query_params(('a', 'b', 'c'))
-    assert str(url) == 'https://example.org/path/to'
+    assert url == 'https://example.org/path/to'
     assert url.query == ''
 
 
@@ -134,10 +134,10 @@ def test_url_include_query_params() -> None:
     assert url.query == 'a=1'
     url = url.include_query_params(a=2)
     assert url.query == 'a=2'
-    assert str(url) == 'https://example.org/path/to?a=2'
+    assert url == 'https://example.org/path/to?a=2'
     url = url.include_query_params(search='test')
     assert url.query == 'a=2&search=test'
-    assert str(url) == 'https://example.org/path/to?a=2&search=test'
+    assert url == 'https://example.org/path/to?a=2&search=test'
 
 
 def test_hidden_password() -> None:
@@ -147,3 +147,51 @@ def test_hidden_password() -> None:
     assert repr(url) == "URL('https://username@example.org/path/to?a=1')"
     url = URL('https://username:password@example.org/path/to?a=1')
     assert repr(url) == "URL('https://username:**********@example.org/path/to?a=1')"
+
+
+def test_url_from_scope() -> None:
+    url = URL.from_scope(
+        {
+            'path': '/path/to/somewhere',
+            'query_string': b'a=1',
+            'headers': []
+        }
+    )
+    assert url == '/path/to/somewhere?a=1'
+    assert repr(url) == "URL('/path/to/somewhere?a=1')"
+
+    url = URL.from_scope(
+        {
+            'scheme': 'https',
+            'server': ('example.org', 8000),
+            'path': '/path/to/somewhere',
+            'query_string': b'a=1',
+            'headers': []
+        }
+    )
+    assert url == 'https://example.org:8000/path/to/somewhere?a=1'
+    assert repr(url) == "URL('https://example.org:8000/path/to/somewhere?a=1')"
+
+    url = URL.from_scope({
+        'scheme': 'http',
+        'path': '/path/to/somewhere',
+        'query_string': b'a=1',
+        'headers': [
+            (b'content-type', b'text/html'),
+            (b'host', b'example.com:8000'),
+            (b'accept', b'text/html')
+        ]
+    })
+
+    assert url == 'http://example.com:8000/path/to/somewhere?a=1'
+    assert repr(url) == "URL('http://example.com:8000/path/to/somewhere?a=1')"
+
+    url = URL.from_scope({
+        'scheme': 'https',
+        'server': ('example.org', 443),
+        'path': '/path/to/somewhere',
+        'query_string': b'a=1',
+        'headers': []
+    })
+    assert url == 'https://example.org/path/to/somewhere?a=1'
+    assert repr(url) == "URL('https://example.org/path/to/somewhere?a=1')"
