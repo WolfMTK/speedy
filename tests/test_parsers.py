@@ -16,6 +16,6 @@ def test_parse_query_string() -> None:
     for key, value in query.items():
         if isinstance(value, list) and len(value) > 1:
             for i in value:
-                assert (key, str(i)) in query_string
+                assert (key, str(i)) in query_string  # type: ignore[operator]
         else:
-            assert (key, str(value)) in query_string
+            assert (key, str(value)) in query_string  # type: ignore[operator]
