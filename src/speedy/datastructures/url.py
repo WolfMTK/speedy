@@ -268,3 +268,24 @@ class URL:
     def _replace_query(self, query: str) -> Self:
         components = self.components._replace(query=query)
         return type(self)._new(components.geturl())
+
+
+class URLPath:
+    """ Create an absolute URL. """
+
+    def __init__(self, path: str | URL, base: str | URL) -> None:
+        self.path = path
+        self.base = base
+
+    def __str__(self) -> str:
+        return self._make_absolute_url()
+
+    def __repr__(self) -> str:
+        path = self.path
+        base = self.base
+        return f'{type(self).__name__}(path={path!r}, base={base!r})'
+
+    def _make_absolute_url(self) -> str:
+        url = self.base if isinstance(self.base, URL) else URL(self.base)
+        path = url.path.rstrip('/') + str(self.path)
+        return str(URL.from_components(URLComponents(scheme=url.scheme, netloc=url.netloc, path=path)))
