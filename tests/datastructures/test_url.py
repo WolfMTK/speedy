@@ -1,4 +1,6 @@
-from speedy.datastructures.url import URL
+import pytest
+
+from speedy.datastructures.url import URL, URLComponents
 
 
 def test_url() -> None:
@@ -14,11 +16,29 @@ def test_url() -> None:
     assert url.fragment == "anchor"
 
 
-def test_replace():
+@pytest.mark.parametrize(
+    'component, value', [
+        ('scheme', 'https'),
+        ('netloc', 'example.org'),
+        ('path', '/foo/to'),
+        ('query', 'a=1'),
+        ('fragment', 'anchor')
+    ]
+)
+def test_from_components(component: str, value: str) -> None:
+    url_component = URLComponents(**{component: value})
+    expected = {'scheme': '', 'netloc': '', 'path': '', 'query': '', 'fragment': '', component: value}
+    url = URL.from_components(url_component)
+    for key, value in expected.items():
+        assert getattr(url, key) == value
+
+
+def test_replace() -> None:
     url = URL('https://example.org:8000/path/to/somewhere?abc=123#anchor')
     new_url = url.replace(scheme='http')
     assert str(new_url) == 'http://example.org:8000/path/to/somewhere?abc=123#anchor'
     assert new_url.scheme == 'http'
+
     new_url = url.replace(port=None)
     assert str(new_url) == 'https://example.org/path/to/somewhere?abc=123#anchor'
     assert new_url.port is None
