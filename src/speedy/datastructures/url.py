@@ -18,7 +18,7 @@ class Address(NamedTuple):
 _DEFAULT_SCHEMA_PORTS = {'http': 80, 'https': 443, 'ws': 80, 'wss': 443}
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class URLComponents:
     """ Components in the URL. """
 
