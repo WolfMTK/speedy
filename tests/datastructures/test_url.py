@@ -25,14 +25,24 @@ def test_url_repr() -> None:
     assert repr(url) == "URL('https://example.org:8000/path/to/somewhere?abc=123#anchor')"
 
 
-def test_url_replace_query() -> None:
+def test_url_replace_query_params() -> None:
     url = URL('https://example.org:8000/path/to/somewhere?abc=123#anchor')
-    assert url.query == "abc=123"
-    url = url.replace_query(order='name')
+    assert url.query == 'abc=123'
+    url = url.replace_query_params(order='name')
     assert str(url) == 'https://example.org:8000/path/to/somewhere?order=name#anchor'
     assert url.query == 'order=name'
+
+
+def test_url_remove_query_params() -> None:
     url = URL('https://example.org/path/to?a=1&b=2')
     assert url.query == 'a=1&b=2'
+    url = url.remove_query_params('a')
+    assert str(url) == 'https://example.org/path/to?b=2'
+    assert url.query == 'b=2'
+    url = URL('https://example.org/path/to?a=1&b=2&c=3')
+    url = url.remove_query_params(('a', 'b', 'c'))
+    assert str(url) == 'https://example.org/path/to'
+    assert url.query == ''
 
 
 def test_url_include_query_params() -> None:
