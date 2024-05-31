@@ -1,6 +1,31 @@
 import pytest
 
-from speedy.datastructures.url import URL, URLComponents
+from speedy.datastructures.url import URL, URLComponents, URLPath
+
+
+@pytest.mark.parametrize(
+    'base, path', [
+        ('http://example.org', 'foo/bar?a=1&b=2'),
+        ('http://example.org/', 'foo/bar?a=1&b=2'),
+        ('http://example.org', '/foo/bar?a=1&b=2'),
+        ('http://example.org', '/foo/bar?a=1&b=2')
+    ]
+)
+def test_url_path(base: str, path: str) -> None:
+    result = 'http://example.org/foo/bar?a=1&b=2'
+    assert str(URLPath(path, base)) == result
+
+
+@pytest.mark.parametrize(
+    'base, path', [
+        ('http://example.org', 'foo/bar?a=1&b=2'),
+        ('http://example.org/', 'foo/bar?a=1&b=2'),
+        ('http://example.org', '/foo/bar?a=1&b=2'),
+        ('http://example.org', '/foo/bar?a=1&b=2')
+    ]
+)
+def test_url_path_repr(base: str, path: str) -> None:
+    assert repr(URLPath(path, base)) == f"URLPath(path={path!r}, base={base!r})"
 
 
 def test_url() -> None:
