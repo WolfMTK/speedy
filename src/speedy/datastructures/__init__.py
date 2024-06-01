@@ -1,17 +1,7 @@
-from .cookie import Cookie
-from .websocket import (
-    WebSocketCloseEvent,
-    WebSocketAcceptEvent,
-    WebSocketSendTextEvent,
-    WebSocketSendBytesEvent,
-)
 from .url import URL
+from .headers import Headers
 
 __all__ = (
-    'Cookie',
-    'WebSocketCloseEvent',
-    'WebSocketAcceptEvent',
-    'WebSocketSendTextEvent',
-    'WebSocketSendBytesEvent',
-    'URL'
+    'URL',
+    'Headers'
 )

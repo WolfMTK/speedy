@@ -1,8 +1,9 @@
-from .base import HTTPException
-from .websocket import RuntimeWebSocketException, WebSocketDisconnect
+from .http_exceptions import HTTPException, InternalServerException
+from .websocket_exceptions import WebSocketException, WebSocketDisconnect
 
 __all__ = (
     'HTTPException',
-    'RuntimeWebSocketException',
+    'InternalServerException',
+    'WebSocketException',
     'WebSocketDisconnect'
 )

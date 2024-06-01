@@ -44,6 +44,7 @@ class BaseScope(TypedDict):
     raw_path: bytes
     query_string: bytes
     root_path: str
+    path_params: dict[str, str]
     headers: Iterable[tuple[bytes, bytes]]
     client: tuple[str, int] | None
     server: tuple[str, int | None] | None
@@ -263,9 +264,9 @@ Message: TypeAlias = Union[HTTPReceiveMessage, WebSocketReceiveMessage]
 
 ASGIReceiveEvent: TypeAlias = Union[
     HTTPReceiveMessage,
-    WebSocketReceiveMessage,
-    LifeSpanReceiveMessage
+    WebSocketReceiveMessage
 ]
+
 
 ASGIReceiveCallable: TypeAlias = Callable[[], Awaitable[ASGIReceiveEvent]]
 
@@ -294,8 +295,7 @@ LifeSpanSendMessage: TypeAlias = Union[
 
 ASGISendEvent: TypeAlias = Union[
     HTTPSendMessage,
-    WebSocketSendMessage,
-    LifeSpanSendMessage
+    WebSocketSendMessage
 ]
 
 ASGISendCallable: TypeAlias = Callable[[ASGISendEvent], Awaitable[None]]

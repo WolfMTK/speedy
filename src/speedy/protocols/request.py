@@ -1,13 +1,16 @@
 from abc import ABC, abstractmethod
+from typing import AsyncGenerator
 
-from speedy.types import ASGIReceiveCallable
+from speedy.types import Method
 
 
 class AbstractRequest(ABC):
     @property
     @abstractmethod
-    def method(self) -> str: ...
+    def method(self) -> Method: ...
 
-    @property
     @abstractmethod
-    def receive(self) -> ASGIReceiveCallable: ...
+    async def stream(self) -> AsyncGenerator[bytes, None]: ...
+
+    @abstractmethod
+    async def body(self) -> bytes: ...
