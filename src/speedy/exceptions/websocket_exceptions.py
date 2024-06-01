@@ -5,5 +5,5 @@ class WebSocketException(ASGIApplicationException):
     """ Exception class for websocket related events. """
 
 
-class WebSocketDisconnect:
+class WebSocketDisconnect(WebSocketException):
     """ Exception class for websocket disconnect events. """
