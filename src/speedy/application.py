@@ -1,9 +1,10 @@
-from typing import Sequence, Any
+from typing import Sequence
 
 from speedy.middleware import Middleware
 from speedy.protocols.application import ASGIApplication
 from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable
 from speedy.types.application import ASGIAppType
+from speedy.types.asgi_types import LifespanScope, LifeSpanReceiveMessage, LifeSpanSendMessage
 
 
 class Speedy(ASGIApplication):
@@ -11,7 +12,12 @@ class Speedy(ASGIApplication):
         self.middleware_stack: ASGIAppType | None = None
         self.user_middleware = self._get_user_middleware(middleware)
 
-    async def __call__(self, scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable) -> None:
+    async def __call__(
+            self,
+            scope: Scope | LifespanScope,
+            receive: ASGIReceiveCallable | LifeSpanReceiveMessage,
+            send: ASGISendCallable | LifeSpanSendMessage
+    ) -> None:
         scope['app'] = self
 
         if self.middleware_stack is None:

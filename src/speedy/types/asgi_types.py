@@ -287,9 +287,9 @@ Message: TypeAlias = Union[HTTPReceiveMessage, WebSocketReceiveMessage]
 
 ASGIReceiveEvent: TypeAlias = Union[
     HTTPReceiveMessage,
-    WebSocketReceiveMessage,
-    LifeSpanReceiveMessage
+    WebSocketReceiveMessage
 ]
+
 
 ASGIReceiveCallable: TypeAlias = Callable[[], Awaitable[ASGIReceiveEvent]]
 
@@ -318,8 +318,7 @@ LifeSpanSendMessage: TypeAlias = Union[
 
 ASGISendEvent: TypeAlias = Union[
     HTTPSendMessage,
-    WebSocketSendMessage,
-    LifeSpanSendMessage
+    WebSocketSendMessage
 ]
 
 ASGISendCallable: TypeAlias = Callable[[ASGISendEvent], Awaitable[None]]

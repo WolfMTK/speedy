@@ -11,5 +11,4 @@ from .asgi_types import (
 
 ASGIAppType = Callable[[Scope | LifespanScope,
                         ASGIReceiveCallable | LifeSpanReceiveMessage,
-                        ASGISendCallable |
-                        LifeSpanSendMessage], Awaitable[None]]
+                        ASGISendCallable | LifeSpanSendMessage], Awaitable[None]]
