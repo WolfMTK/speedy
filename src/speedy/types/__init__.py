@@ -7,6 +7,7 @@ from .asgi_types import (
     Method,
     HttpScope,
     HTTPReceiveMessage,
+    WebSocketScope,
 )
 
 __all__ = (
@@ -16,5 +17,6 @@ __all__ = (
     'Message',
     'Method',
     'HttpScope',
-    'HTTPReceiveMessage'
+    'HTTPReceiveMessage',
+    'WebSocketScope'
 )
