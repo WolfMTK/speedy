@@ -1,0 +1,2 @@
+class ASGIApplicationException(Exception):
+    pass
