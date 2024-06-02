@@ -19,13 +19,14 @@ class WebSocket(AbstractWebsocket, ASGIConnect):
 
     scope: WebSocketScope
 
+
     def __init__(
             self,
             scope: Scope,
             receive: ASGIReceiveCallable = empty_receive,
             send: ASGISendCallable = empty_send
     ) -> None:
-        super().__init__(scope, self.receive_wrapper(receive), send)
+        super().__init__(scope, self.receive_wrapper(receive), self.send_wrapper(send))
         self.connection_state = WebSocketState.INIT
 
     def receive_wrapper(self, receive: ASGIReceiveCallable) -> ASGIReceiveCallable:
@@ -44,3 +45,12 @@ class WebSocket(AbstractWebsocket, ASGIConnect):
                     self.connection_state = WebSocketState.DISCONNECT
             return message
         return wrapped_receive
+
+    def send_wrapper(self, send: ASGISendCallable) -> ASGIReceiveCallable:
+        """ Wrap over send to ensure that the state is not disconnected. """
+        async def wrapped_send(message: Message) -> None:
+            if self.connection_state == WebSocketState.DISCONNECT:
+                raise WebSocketDisconnect(DISCONNECT_MESSAGE)
+            await send(message)
+
+        return wrapped_send
