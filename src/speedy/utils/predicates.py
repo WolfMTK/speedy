@@ -1,7 +1,7 @@
 import asyncio
 from typing import TypeVar, ParamSpec, Callable, TypeGuard, Awaitable
 
-from speedy.utils.helpers import unwrap_partial
+from .helpers import unwrap_partial
 
 P = ParamSpec('P')
 T = TypeVar('T')

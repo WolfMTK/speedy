@@ -1,7 +1,7 @@
 import functools
 from typing import Any
 
-from speedy.utils import is_async_callable
+from speedy.utils.predicates import is_async_callable
 
 
 def test_async_func() -> None:
