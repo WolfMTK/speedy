@@ -8,6 +8,8 @@ from speedy.types.application import SAMESITE
 
 @dataclass
 class Cookie:
+    """ Container class for defining a cookie. """
+
     key: str
     value: str | None = field(default=None)
     max_age: int | None = field(default=None)
