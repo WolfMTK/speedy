@@ -1,4 +1,4 @@
-from typing import Callable, Awaitable
+from typing import Callable, Awaitable, Literal
 
 from .asgi_types import (
     Scope,
@@ -12,3 +12,4 @@ from .asgi_types import (
 ASGIAppType = Callable[[Scope | LifespanScope,
                         ASGIReceiveCallable | LifeSpanReceiveMessage,
                         ASGISendCallable | LifeSpanSendMessage], Awaitable[None]]
+SAMESITE = Literal['lax', 'strict', 'none']
