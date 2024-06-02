@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any
 
+from speedy.types.application import SAMESITE
+
 
 class AbstractResponse(ABC):
     @abstractmethod
@@ -14,10 +16,11 @@ class AbstractResponse(ABC):
             value: str,
             max_age: int | None,
             expires: datetime | str | int | None,
-            path: str,
+            path: str | None,
+            domain: str | None,
             secure: bool,
             httponly: bool,
-            samesite: str
+            samesite: SAMESITE
     ) -> None: ...
 
     @abstractmethod
@@ -28,7 +31,7 @@ class AbstractResponse(ABC):
             domain: str | None,
             secure: bool,
             httponly: bool,
-            samesite: str
+            samesite: SAMESITE
     ) -> None: ...
 
     @abstractmethod
