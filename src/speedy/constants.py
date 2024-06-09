@@ -1,11 +1,1 @@
-HTTP_METHODS = (
-    'GET',
-    'POST',
-    'DELETE',
-    'PATCH',
-    'PUT',
-    'HEAD',
-    'TRACE',
-    'OPTIONS'
-)
-SAMESITE = ('lax', 'strict', 'none')
+ONE_MEGABYTE = 1024 * 1024
