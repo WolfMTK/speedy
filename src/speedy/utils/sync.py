@@ -15,6 +15,7 @@ def ensure_async_callable(func: Callable[P, T]) -> Callable[P, Awaitable[T]]:
 
 
 class AsyncCallable:
+    """ Wrapper a given callable to be called in a thread pool. """
     def __init__(self, function: Callable[P, T]) -> None:
         self.function = function
 
