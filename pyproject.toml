@@ -6,10 +6,11 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [project]
-name = "speedy"
+name = "SpeedApi"
 version = "0.0.1"
 authors = [
-    { name = "Alexander Kuzmin", email = "qrer71@yandex.ru" }
+    { name = "Alexander Kuzmin", email = "qrer71@yandex.ru" },
+    { name = "Alexander Kuzmin", email = "funks.1@yandex.ru" }
 ]
 license = { file = "LICENSE" }
 description = "In development"
@@ -40,6 +41,7 @@ dev = [
 
 [project.urls]
 "Homepage" = "https://github.com/WolfMTK/speedy"
+"Repository" = "https://github.com/WolfMTK/speedy"
 
 [tool.coverage.run]
 concurrency = ["multiprocessing", "thread"]
