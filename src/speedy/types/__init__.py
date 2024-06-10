@@ -1,3 +1,4 @@
+from .application import ASGIAppType, SAMESITE
 from .asgi_types import (
     Scope,
     ASGIReceiveCallable,
@@ -22,5 +23,7 @@ __all__ = (
     'HTTPReceiveMessage',
     'WebSocketScope',
     'HTTPSendMessage',
-    'WebSocketSendMessage'
+    'WebSocketSendMessage',
+    'ASGIAppType',
+    'SAMESITE'
 )
