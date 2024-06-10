@@ -18,7 +18,7 @@ class Cookie:
     domain: str | None = field(default=None)
     secure: bool = field(default=False)
     httponly: bool = field(default=False)
-    semesite: SAMESITE = field(default='lax')
+    samesite: SAMESITE = field(default='lax')
 
     def __hash__(self):
         return hash((self.key, self.path, self.domain))
@@ -50,3 +50,11 @@ class Cookie:
             if key == 'max_age':
                 data['max-age'] = value
         return data
+
+    def to_header(self, **kwargs: Any) -> str:
+        """ Return a string representation suitable to be sent as HTTP headers. """
+        return self.simple_cookie.output(**kwargs).strip()
+
+    def to_encoded_header(self) -> tuple[bytes, bytes]:
+        """ Create encoded header for send a scope. """
+        return b'set-cookie', self.to_header(header='').encode('latin-1')

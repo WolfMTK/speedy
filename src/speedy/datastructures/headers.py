@@ -63,6 +63,7 @@ class MutableHeaders(Headers):
 
     @property
     def raw(self) -> RawHeaders:
+        """ Raw header value. """
         return self._headers_list
 
     def append(self, key: str, value: str) -> None:

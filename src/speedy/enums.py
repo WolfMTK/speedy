@@ -2,6 +2,8 @@ from enum import StrEnum
 
 
 class HttpMethod(StrEnum):
+    """ An enum for HTTP methods. """
+
     GET = 'GET'
     POST = 'POST'
     DELETE = 'DELETE'
@@ -13,34 +15,19 @@ class HttpMethod(StrEnum):
 
 
 class ScopeType(StrEnum):
+    """ An enum for the 'http' key stored under Scoped. """
+
     HTTP = 'http'
     WEBSOCKET = 'websocket'
+    LIFESPAN = 'lifespan'
 
 
-class MediaTextType(StrEnum):
-    PLAIN = 'text/plain'
+class MediaType(StrEnum):
+    """ An enum for content-type header values. """
 
-
-class WebSocketState(StrEnum):
-    CONNECTING = 'connecting'
-    CONNECTED = 'connected'
-    DISCONNECTED = 'disconnected'
-    RESPONSE = 'response'
-
-
-class WebSocketStatusEvent(StrEnum):
-    START = 'websocket.http.response.start'
-    SEND = 'websocket.http.send'
-    SEND_EVENT = 'websocket.send'
-    ACCEPT = 'websocket.accept'
-    BODY = 'websocket.http.response.body'
-    CLOSE = 'websocket.close'
-    CONNECT = 'websocket.connect'
-    RECEIVE = 'websocket.receive'
-    DISCONNECT = 'websocket.disconnect'
-
-
-class WebSocketEncoding(StrEnum):
-    TEXT = 'text'
-    BYTES = 'bytes'
-    JSON = 'json'
+    JSON = 'application/json'
+    XML = 'application/xml'
+    HTML = 'text/html'
+    TEXT = 'text/plain'
+    CSS = 'text/css'
+    MESSAGEPACK = 'application/x-msgpack'
