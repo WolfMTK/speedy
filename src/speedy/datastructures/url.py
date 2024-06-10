@@ -63,7 +63,6 @@ class URL:
         server = scope.get('server', None)
         path = scope['path']
         query_string = scope.get('query_string', b'')
-        url = ''
 
         host_header = None
         for key, value in scope['headers']:
