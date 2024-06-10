@@ -18,7 +18,7 @@ class Cookie:
     domain: str | None = field(default=None)
     secure: bool = field(default=False)
     httponly: bool = field(default=False)
-    semesite: SAMESITE = field(default='lax')
+    samesite: SAMESITE = field(default='lax')
 
     def __hash__(self):
         return hash((self.key, self.path, self.domain))
