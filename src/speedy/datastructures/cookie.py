@@ -50,3 +50,11 @@ class Cookie:
             if key == 'max_age':
                 data['max-age'] = value
         return data
+
+    def to_header(self, **kwargs: Any) -> str:
+        """ Return a string representation suitable to be sent as HTTP headers. """
+        return self.simple_cookie.output(**kwargs).strip()
+
+    def to_encoded_header(self) -> tuple[bytes, bytes]:
+        """ Create encoded header for send a scope. """
+        return b'set-cookie', self.to_header(header='').encode('latin-1')
