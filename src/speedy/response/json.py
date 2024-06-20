@@ -1,18 +1,21 @@
-from typing import Any, Sequence, Mapping
+from typing import Any, Sequence, Mapping, Literal
 
 from speedy import MediaType, BackgroundTask
 from speedy.datastructures.cookie import Cookie
 from speedy.exceptions import InvalidJSONLibrary
+from speedy.protocols.response import AbstractJSONResponse
 from speedy.response.base import Response
 from speedy.status_code import HTTP_200_OK
 
+_LIBRARY_JSON = Literal['json', 'ujson', 'orjson']
 
-class JSONResponse(Response):
+
+class JSONResponse(AbstractJSONResponse, Response):
     def __init__(
             self,
             content: Any | None = None,
             status_code: int = HTTP_200_OK,
-            library_json: str = 'json',
+            library_json: _LIBRARY_JSON = 'json',
             encoding: str = 'utf-8',
             cookie: Sequence[Cookie] | Mapping[str, str] | None = None,
             headers: Mapping[str, str] | None = None,
@@ -33,6 +36,10 @@ class JSONResponse(Response):
             media_type=MediaType.JSON,
             background=background
         )
+
+    @property
+    def library(self) -> str:
+        return self._library
 
     def render(self, content: Any | None) -> bytes:
         """
