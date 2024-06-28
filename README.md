@@ -1,5 +1,5 @@
-# speedy
-In development
+# SpeedAPI
+The little ASGI framework
 
-# !!!WARNING!!!
-Description and documentation will be added after the functional is added
+# Current status
+Under development
