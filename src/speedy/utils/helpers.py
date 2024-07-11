@@ -1,5 +1,10 @@
 import functools
-from typing import TypeVar, cast
+import inspect
+import re
+from collections.abc import Callable
+from typing import TypeVar, cast, Any
+
+from speedy.types import Scope
 
 T = TypeVar('T')
 
@@ -15,3 +20,16 @@ def unwrap_partial(value: T) -> T:
             value, (functools.partial, AsyncCallable)
         ) else value
     )
+
+
+def get_route_path(scope: Scope) -> str:
+    """ Get route path. """
+    root_path = scope.get('root_path', '')
+    root_path = re.sub(r'^' + root_path, '', scope['path'])
+    return root_path
+
+
+def get_endpoint_name(endpoint: Callable[..., Any]) -> str:
+    if inspect.iscoroutine(endpoint) or inspect.isclass(endpoint):
+        return endpoint.__name__
+    return endpoint.__class__.__name__
