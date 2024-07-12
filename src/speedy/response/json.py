@@ -3,14 +3,13 @@ from typing import Any, Sequence, Mapping, Literal
 from speedy import MediaType, BackgroundTask
 from speedy.datastructures.cookie import Cookie
 from speedy.exceptions import InvalidJSONLibrary
-from speedy.protocols.response import AbstractJSONResponse
 from speedy.response.base import Response
 from speedy.status_code import HTTP_200_OK
 
 _LIBRARY_JSON = Literal['json', 'ujson', 'orjson']
 
 
-class JSONResponse(AbstractJSONResponse, Response):
+class JSONResponse(Response):
     def __init__(
             self,
             content: Any | None = None,
