@@ -1,10 +1,10 @@
 from speedy.enums import ScopeType
-from speedy.protocols.middleware import BaseMiddleware
+from speedy.protocols.middleware import AbstractMiddleware
 from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable, Message
 from speedy.types.application import ASGIAppType
 
 
-class ServerErrorMiddleware(BaseMiddleware):
+class ServerErrorMiddleware(AbstractMiddleware):
     def __init__(self, app: ASGIAppType) -> None:
         self.app = app
         self.started_response = False

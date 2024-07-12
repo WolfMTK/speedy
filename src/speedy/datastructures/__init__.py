@@ -1,4 +1,4 @@
-from .url import URL
+from .url import URL, URLPath
 from .headers import Headers, MutableHeaders
 from .upload_file import UploadFile
 from .state import State
@@ -8,5 +8,6 @@ __all__ = (
     'Headers',
     'MutableHeaders',
     'UploadFile',
-    'State'
+    'State',
+    'URLPath'
 )

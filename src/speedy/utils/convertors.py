@@ -53,6 +53,7 @@ class IntegerConvertor(Convertor[int]):
         value = int(value)
         if value < ZERO:
             raise EmptyException('Negative integers are not supported')
+        return str(value)
 
 
 class FloatConvertor(Convertor[float]):

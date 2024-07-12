@@ -1,22 +1,13 @@
-from collections.abc import Iterator
-from typing import Any, ParamSpec
+from typing import ParamSpec, Iterator, Any
 
-from speedy.protocols import BaseMiddleware
+from speedy.protocols.middleware import MiddlewareProtocol
 
 P = ParamSpec('P')
 
 
 class Middleware:
-    """ Base middleware. """
-
-    __slots__ = ('cls', 'args', 'kwargs')
-
-    def __init__(
-            self,
-            cls: type[BaseMiddleware[P]],
-            *args: P.args,
-            **kwargs: P.kwargs
-    ) -> None:
+    """ Middleware class. """
+    def __init__(self, cls: type[MiddlewareProtocol], *args: P.args, **kwargs: P.kwargs) -> None:
         self.cls = cls
         self.args = args
         self.kwargs = kwargs
@@ -24,19 +15,19 @@ class Middleware:
     def __iter__(self) -> Iterator[Any]:
         return iter((self.cls, self.args, self.kwargs))
 
-    def __repr__(self) -> str:
-        class_name = type(self).__name__
-        class_args = ', '.join(
+    def __repr__(self):
+        _class = type(self).__name__
+        args = ', '.join(
             [self.cls.__name__]
-            + list(self._get_args_arr_sting())
-            + list(self._get_kwargs_arr_string())
+            + list(self._get_args_to_string())
+            + list(self._get_option_to_string())
         )
-        return f'{class_name}({class_args})'
+        return f'{_class}({args})'
 
-    def _get_args_arr_sting(self) -> Iterator[str]:
+    def _get_args_to_string(self) -> Iterator[str]:
         for value in self.args:
             yield f'{value!r}'
 
-    def _get_kwargs_arr_string(self) -> Iterator[str]:
-        for key, value in self.kwargs.items():
+    def _get_option_to_string(self) -> Iterator[str]:
+        for key, value in self.kwargs:
             yield f'{key}={value!r}'

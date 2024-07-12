@@ -1,4 +1,4 @@
-from enum import StrEnum
+from enum import StrEnum, IntEnum
 
 
 class HttpMethod(StrEnum):
@@ -31,3 +31,9 @@ class MediaType(StrEnum):
     TEXT = 'text/plain'
     CSS = 'text/css'
     MESSAGEPACK = 'application/x-msgpack'
+
+
+class Match(IntEnum):
+    NONE = 0
+    PARTIAL = 1
+    FULL = 2
