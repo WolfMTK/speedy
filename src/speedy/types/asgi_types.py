@@ -27,6 +27,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
+from __future__ import annotations
 
 from typing import (
     Union,
@@ -38,13 +39,15 @@ from typing import (
     Callable,
     Awaitable,
     TypeAlias,
-    TypeVar,
+    TYPE_CHECKING
 )
 
 from speedy.enums import HttpMethod, ScopeType
 
+if TYPE_CHECKING:
+    from speedy.protocols import ASGIApplication
+
 Method: TypeAlias = Union[Literal['GET', 'POST', 'DELETE', 'PATCH', 'PUT', 'HEAD', 'TRACE', 'OPTIONS'], HttpMethod]
-ASGIApplication = TypeVar('ASGIApplication')
 
 Version = Literal['2.0'] | Literal['3.0']
 
@@ -290,7 +293,6 @@ ASGIReceiveEvent: TypeAlias = Union[
     HTTPReceiveMessage,
     WebSocketReceiveMessage
 ]
-
 
 ASGIReceiveCallable: TypeAlias = Callable[[], Awaitable[ASGIReceiveEvent]]
 
