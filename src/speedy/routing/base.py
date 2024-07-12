@@ -1,12 +1,12 @@
 import re
 from abc import ABC
 from dataclasses import dataclass
-from enum import IntEnum
 from typing import Any, Self, Pattern
 
+from speedy import Match
 from speedy.connection.websockets import WebSocketClose
-from speedy.datastructures.url import URLPath
 from speedy.exceptions.base import ConvertorTypeException
+from speedy.protocols.route import AbstractRoute
 from speedy.response import PlainTextResponse
 from speedy.status_code import HTTP_404_NOT_FOUND, WS_1000_NORMAL_CLOSURE
 from speedy.types import Scope
@@ -17,17 +17,8 @@ from speedy.types.asgi_types import (
 from speedy.utils.convertors import CONVERTOR_TYPES, Convertor
 
 
-class Match(IntEnum):
-    NONE = 0
-    PARTIAL = 1
-    FULL = 2
-
-
-class BaseRoute(ABC):
-    async def __call__(self,
-                       scope: Scope,
-                       receive: ASGIReceiveCallable,
-                       send: ASGISendCallable):
+class BaseRoute(AbstractRoute, ABC):
+    async def __call__(self, scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable) -> None:
         match, child_scope = self.matches(scope)
 
         match Match:
@@ -39,18 +30,6 @@ class BaseRoute(ABC):
             case _:
                 scope.update(child_scope)
                 await self.handle(scope, receive, send)
-
-    def matches(self, scope: Scope) -> tuple[Match, Scope]:
-        ...
-
-    def url_path_for(self, name: str, **params: Any) -> URLPath:
-        ...
-
-    async def handle(self,
-                     scope: Scope,
-                     receive: ASGIReceiveCallable,
-                     send: ASGISendCallable) -> None:
-        ...
 
     async def _send_response_not_found(self,
                                        scope: Scope,
