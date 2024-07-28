@@ -1,30 +1,173 @@
-from abc import ABC
-from typing import TypeVar, Generic, Mapping, Iterable, Iterator
+from __future__ import annotations
 
-from multidict import MultiDict as _MultiDict
-from multidict import MultiMapping
+from collections.abc import KeysView, ValuesView, ItemsView, Iterator
+from typing import TypeVar, Mapping, Iterable, Any
+
+from speedy.protocols import MultiMapping
 
 T = TypeVar('T')
 
 
-class MultiMixin(Generic[T], MultiMapping[T], ABC):
-    """ Mixin providing common methods for multi dicts. """
+class ImmutableMultiDict[_Key, _Value](MultiMapping[_Key, _Value]):
+    """ Immutable MultiDict. """
 
-    def multi_items(self) -> Iterator[tuple[str, T]]:
-        """ Get all keys and values, including duplicates. """
-        stack = []
+    def __init__(
+            self,
+            *args: MultiMapping[_Key, _Value] | Mapping[_Key, _Value] | Iterable[tuple[_Key, _Value]],
+            **kwargs: Any
+    ) -> None:
+        self._check_args(*args)
+        items = self._get_items(*args, **kwargs)
+        self._stack = items
+        self._dict = {key: value for key, value in items}
 
-        for key in tuple(self):
-            if key in stack:
-                continue
-            stack.append(key)
+    def __setitem__(self, key: _Key, values: list[_Value]) -> None:
+        items = [(k, v) for (k, v) in self._stack if k != key]
+        self._stack = items + [(key, value) for value in values]
+        self._dict[key] = values[-1]
 
-            for value in self.getall(key):
-                yield key, value
+    def __getitem__(self, key: _Key) -> _Value:
+        return self._dict[key]
+
+    def __delitem__(self, key: Any) -> None:
+        self._stack = [(k, v) for k, v in self._stack if k != key]
+        del self._dict[key]
+
+    def __contains__(self, key: Any) -> bool:
+        return key in self._dict
+
+    def __iter__(self) -> Iterator[_Key]:
+        return iter(self._dict)
+
+    def __len__(self) -> int:
+        return len(self._dict)
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, self.__class__):
+            return False
+        return sorted(self._stack) == sorted(other._stack)
+
+    def __repr__(self) -> str:
+        items = self.multi_items()
+        return f'{type(self).__name__}({items!r})'
+
+    def get(self, key: Any, default: Any = None) -> Any:
+        return self._dict.get(key, default)
+
+    def update(
+            self,
+            *args: Mapping[_Key, _Value] | MultiMapping[_Key, _Value] | list[tuple[Any, Any]],
+            **kwargs: Any
+    ) -> None:
+        """ Update items """
+        value = ImmutableMultiDict(*args, **kwargs)
+        items = [(k, v) for k, v in self._stack if k not in value.keys()]
+        self._stack = items + value.multi_items()
+        self._dict.update(value)
+
+    def keys(self) -> KeysView[_Key]:
+        """ Get keys. """
+        return self._dict.keys()
+
+    def values(self) -> ValuesView[_Value]:
+        """ Get values. """
+        return self._dict.values()
+
+    def items(self) -> ItemsView[_Key, _Value]:
+        """ Get items. """
+        return self._dict.items()
+
+    def clear(self) -> None:
+        """ Clear items. """
+        self._dict.clear()
+        self._stack.clear()
+
+    def pop(self, key: Any, default: Any = None):
+        """ Pop element in collection. """
+        self._stack = [(k, v) for k, v in self._stack if k != key]
+        return self._dict.pop(key, default)
+
+    def popitem(self) -> tuple[Any, Any]:
+        """ Popitem element in collection. """
+        key, value = self._dict.popitem()
+        self._stack = [(k, v) for k, v in self._stack if k != key]
+        return key, value
+
+    def poplist(self, key: Any) -> list[Any]:
+        """ Poplist element in collection. """
+        values = [v for k, v in self._stack if k == key]
+        self.pop(key)
+        return values
+
+    def append(self, key: Any, value: Any) -> None:
+        """ Append element in collection. """
+        self._stack.append((key, value))
+        self._dict[key] = value
+
+    def getList(self, key: Any) -> list[_Value]:
+        """ Get array elements. """
+        return [v for k, v in self._stack if k == key]
+
+    def multi_items(self) -> list[tuple[_Key, _Value]]:
+        """ Get items. """
+        return list(self._stack)
+
+    def _get_items(
+            self,
+            *args: MultiMapping[_Key, _Value] | Mapping[_Key, _Value] | Iterable[tuple[_Key, _Value]],
+            **kwargs: Any
+    ) -> list[tuple[Any, Any]]:
+        value = args[0] if args else []
+        if kwargs:
+            value = ImmutableMultiDict(value).multi_items() + ImmutableMultiDict(kwargs).multi_items()
+        if not value:
+            return []
+        elif hasattr(value, 'multi_items'):
+            return list(value.multi_items())
+        elif hasattr(value, 'items'):
+            return list(value.items())
+        return list(value)
+
+    def _check_args(
+            self,
+            *args: MultiMapping[_Key, _Value] | Mapping[_Key, _Value] | Iterable[tuple[_Key, _Value]]
+    ) -> None:
+        if not len(args) < 2:
+            raise AttributeError('Too many arguments.')
 
 
-class MultiDict(_MultiDict[T], MultiMixin[T], Generic[T]):
+class MultiDict(ImmutableMultiDict[Any, Any]):
     """ Dictionary with the support for duplicate keys. """
 
-    def __init__(self, args: MultiMapping | Mapping[str, T] | Iterable[tuple[str, T]] | None = None) -> None:
-        super().__init__(args or {})
+    def __setitem__(self, key: Any, value: Any) -> None:
+        self.setlist(key, [value])
+
+    def setdefault(self, key: Any, default: Any = None) -> Any:
+        """ Set default value. """
+        if key not in self:
+            self[key] = default
+        return self[key]
+
+    def setlist(self, key: Any, values: list[Any]) -> None:
+        """ Set list. """
+        if not values:
+            self.pop(key, None)
+            return None
+        self[key] = values
+
+
+# TODO: Replace the structure
+class MultiMixin:
+    """ Mixin providing common methods for multi dicts. """
+
+    # def multi_items(self) -> Iterator[tuple[str, T]]:
+    #     """ Get all keys and values, including duplicates. """
+    #     stack = []
+    #
+    #     for key in tuple(self):
+    #         if key in stack:
+    #             continue
+    #         stack.append(key)
+    #
+    #         for value in self.getall(key):
+    #             yield key, value
