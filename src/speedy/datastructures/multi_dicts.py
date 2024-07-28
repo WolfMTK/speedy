@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import KeysView, ValuesView, ItemsView, Iterator
+from collections.abc import KeysView, ValuesView, ItemsView
 from typing import TypeVar, Mapping, Iterable, Any
 
 from speedy.protocols import MultiMapping
@@ -16,40 +16,10 @@ class ImmutableMultiDict[_Key, _Value](MultiMapping[_Key, _Value]):
             *args: MultiMapping[_Key, _Value] | Mapping[_Key, _Value] | Iterable[tuple[_Key, _Value]],
             **kwargs: Any
     ) -> None:
-        self._check_args(*args)
+        super().__init__(*args, **kwargs)
         items = self._get_items(*args, **kwargs)
         self._stack = items
         self._dict = {key: value for key, value in items}
-
-    def __setitem__(self, key: _Key, values: list[_Value]) -> None:
-        items = [(k, v) for (k, v) in self._stack if k != key]
-        self._stack = items + [(key, value) for value in values]
-        self._dict[key] = values[-1]
-
-    def __getitem__(self, key: _Key) -> _Value:
-        return self._dict[key]
-
-    def __delitem__(self, key: Any) -> None:
-        self._stack = [(k, v) for k, v in self._stack if k != key]
-        del self._dict[key]
-
-    def __contains__(self, key: Any) -> bool:
-        return key in self._dict
-
-    def __iter__(self) -> Iterator[_Key]:
-        return iter(self._dict)
-
-    def __len__(self) -> int:
-        return len(self._dict)
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, self.__class__):
-            return False
-        return sorted(self._stack) == sorted(other._stack)
-
-    def __repr__(self) -> str:
-        items = self.multi_items()
-        return f'{type(self).__name__}({items!r})'
 
     def get(self, key: Any, default: Any = None) -> Any:
         return self._dict.get(key, default)
@@ -127,13 +97,6 @@ class ImmutableMultiDict[_Key, _Value](MultiMapping[_Key, _Value]):
         elif hasattr(value, 'items'):
             return list(value.items())
         return list(value)
-
-    def _check_args(
-            self,
-            *args: MultiMapping[_Key, _Value] | Mapping[_Key, _Value] | Iterable[tuple[_Key, _Value]]
-    ) -> None:
-        if not len(args) < 2:
-            raise AttributeError('Too many arguments.')
 
 
 class MultiDict(ImmutableMultiDict[Any, Any]):
