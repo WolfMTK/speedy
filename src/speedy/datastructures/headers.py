@@ -1,13 +1,11 @@
 from typing import Mapping, Iterable, TypeVar
 
-from multidict import CIMultiDictProxy, MultiMapping, CIMultiDict
-
-from .multi_dicts import MultiMixin
+from multidict import MultiMapping, CIMultiDict
 
 RawHeaders = TypeVar('RawHeaders')
 
 
-class Headers(CIMultiDictProxy[str], MultiMixin[str]):
+class Headers:
     def __init__(
             self,
             headers: Mapping[str, str] | Iterable[tuple[bytes, bytes]] | MultiMapping | None = None
