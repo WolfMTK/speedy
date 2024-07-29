@@ -1,8 +1,9 @@
-from .url import URL, URLPath
+from .cookie import Cookie
 from .headers import Headers, MutableHeaders
-from .upload_file import UploadFile
-from .state import State
 from .multi_dicts import ImmutableMultiDict, MultiDict
+from .state import State
+from .upload_file import UploadFile
+from .url import URL, URLPath
 
 __all__ = (
     'URL',
@@ -12,5 +13,6 @@ __all__ = (
     'MutableHeaders',
     'UploadFile',
     'State',
-    'URLPath'
+    'URLPath',
+    'Cookie'
 )

@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from http.cookies import SimpleCookie
 from typing import Any
 
-from speedy.types.application import SAMESITE
+from speedy.types import SAMESITE
 
 
 @dataclass
@@ -47,8 +49,13 @@ class Cookie:
         """ Get the cookie as a dict. """
         data = {}
         for key, value in asdict(self).items():
+            if key == 'path' and value is None:
+                data[key] = '/'
+                continue
             if key == 'max_age':
                 data['max-age'] = value
+                continue
+            data[key] = value
         return data
 
     def to_header(self, **kwargs: Any) -> str:
