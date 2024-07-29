@@ -36,7 +36,8 @@ dev = [
     "ujson<=5.10.0",
     "orjson<=3.10.3",
     "httpx<=0.27.0",
-    "pytest-cov"
+    "pytest-cov",
+    "time-machine<=2.14.2"
 ]
 
 [project.urls]
