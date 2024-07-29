@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import KeysView, ValuesView, ItemsView
-from typing import TypeVar, Mapping, Iterable, Any
+from typing import Mapping, Iterable, Any
 
 from speedy.protocols import MultiMapping
-
-T = TypeVar('T')
 
 
 class ImmutableMultiDict[_Key, _Value](MultiMapping[_Key, _Value]):
@@ -116,7 +114,7 @@ class MultiDict(ImmutableMultiDict[Any, Any]):
         if not values:
             self.pop(key, None)
             return None
-        self[key] = values
+        super().__setitem__(key, values)
 
 
 # TODO: Replace the structure
