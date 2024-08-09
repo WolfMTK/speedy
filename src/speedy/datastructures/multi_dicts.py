@@ -20,6 +20,7 @@ class ImmutableMultiDict[_Key, _Value](MultiMapping[_Key, _Value]):
         self._dict = {key: value for key, value in items}
 
     def get(self, key: Any, default: Any = None) -> Any:
+        """ Get value. """
         return self._dict.get(key, default)
 
     def update(
