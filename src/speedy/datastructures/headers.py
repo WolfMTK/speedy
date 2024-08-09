@@ -28,7 +28,7 @@ class Headers(Mapping[str, str]):
         return False
 
     def __iter__(self) -> Iterator[Any]:
-        return iter(self._raw)
+        return iter(self.keys())
 
     def __len__(self) -> int:
         return len(self._raw)
