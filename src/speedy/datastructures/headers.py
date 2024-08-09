@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping, Iterator
-from typing import Any
+from typing import Any, Self
 
 from speedy.types import RawHeaders, ScopeHeaders
 
@@ -40,21 +42,29 @@ class Headers(Mapping[str, str]):
 
     @property
     def raw(self) -> RawHeaders:
-        return self._raw
+        """ Get RawHeaders. """
+        return self._raw.copy()
 
     def keys(self) -> list[str]:
+        """ Get keys. """
         return [key.decode('latin-1') for key, _ in self._raw]
 
     def values(self) -> list[str]:
+        """ Get values. """
         return [value.decode('latin-1') for key, value in self._raw]
 
     def items(self) -> list[tuple[str, str]]:
+        """ Get items. """
         return [(key.decode('latin-1'),
                  value.decode('latin-1')) for key, value in self._raw]
 
     def getlist(self, key: str) -> list[str]:
+        """ Get list values. """
         header_key = key.lower().encode('latin-1')
         return [value.decode('latin-1') for key, value in self._raw if header_key == key]
+
+    def mutablecopy(self) -> MutableHeaders:
+        return MutableHeaders(raw=self.raw)
 
     def _get_raw(self,
                  headers: Mapping[str, str] | None = None,
@@ -80,30 +90,74 @@ class Headers(Mapping[str, str]):
 
 class MutableHeaders(Headers):
     def __setitem__(self, key: str, value: str) -> None:
-        """ Set a header in the scope, overwriting duplicates. """
-        set_key = key.lower().encode('latin-1')
-        set_value = key.lower().encode('latin-1')
+        key = key.lower().encode('latin-1')
+        value = value.encode('latin-1')
 
-        if found_indexes := self._find_indices(set_key):
-            for index in reversed(found_indexes[1:]):
-                del self._headers_list[index]
-            self._headers_list[found_indexes[0]] = (set_key, set_value)
+        updated_index = None
+        removed_indexes = []
+        for index, (_key, _) in enumerate(self._raw):
+            if key == _key:
+                if updated_index is None:
+                    updated_index = index
+                    continue
+                removed_indexes.append(index)
+
+        if updated_index is not None:
+            self._raw[updated_index] = (key, value)
         else:
-            self._headers_list.append((set_key, set_value))
+            self._raw.append((key, value))
+
+        for index in removed_indexes:
+            del self._raw[index]
 
     def __delitem__(self, key: str) -> None:
-        found_indexes = self._find_indices(key.lower().encode('latin-1'))
-        for index in found_indexes:
-            del self._headers_list[index]
+        key = key.lower().encode('latin-1')
+
+        indexes = []
+        for index, (_key, _) in enumerate(self._raw):
+            if key == _key:
+                indexes.append(index)
+
+        for index in indexes:
+            del self._raw[index]
+
+    def __ior__(self, other: Mapping[str, str]) -> Self:
+        if not isinstance(other, Mapping):
+            raise TypeError(f'Expected a mapping but got {type(other).__name__}')
+        self.update(other)
+        return self
+
+    def __or__(self, other: Mapping[str, str]) -> Self:
+        if not isinstance(other, Mapping):
+            raise TypeError(f'Expected a mapping but got {type(other).__name__}')
+        mutable_headers = self.mutablecopy()
+        mutable_headers.update(other)
+        return mutable_headers
 
     @property
     def raw(self) -> RawHeaders:
-        """ Raw header value. """
-        return self._headers_list
+        """ Get RawHeaders. """
+        return self._raw
+
+    def update(self, other: Mapping[str, str]) -> None:
+        """ Update RawHeaders. """
+        for key, val in other.items():
+            self[key] = val
 
     def append(self, key: str, value: str) -> None:
-        """ Append a header to the scope. """
-        self._headers_list.append((key.lower().encode('latin-1'), value.lower().encode('latin-1')))
+        """ Append a header, preserving any duplicate entries. """
+        self._raw.append((key.lower().encode('latin-1'), value.encode('latin-1')))
+
+    def setdefault(self, key: str, value: str) -> str:
+        """ Set default key and value in RawHeaders. """
+        key_header = key.lower().encode('latin-1')
+        value_header = value.encode('latin-1')
+
+        for index, (_key, _value) in enumerate(self):
+            if key_header == _key:
+                return _value.decode('latin')
+        self._raw.append((key_header, value_header))
+        return value
 
     def add_vary_header(self, vary: str) -> None:
         """ Extend a multivalued header. """
@@ -111,6 +165,3 @@ class MutableHeaders(Headers):
         if existing is not None:
             vary = ', '.join([existing, vary])
         self['vary'] = vary
-
-    def _find_indices(self, key: bytes) -> list[int]:
-        return [index for index, (item_key, item_value) in enumerate(self._headers_list) if item_key == key]
