@@ -14,7 +14,7 @@ class ImmutableMultiDict[_Key, _Value](MultiMapping[_Key, _Value]):
             *args: MultiMapping[_Key, _Value] | Mapping[_Key, _Value] | Iterable[tuple[_Key, _Value]],
             **kwargs: Any
     ) -> None:
-        super().__init__(*args, **kwargs)
+        self._check_args(*args)
         items = self._get_items(*args, **kwargs)
         self._stack = items
         self._dict = {key: value for key, value in items}
@@ -95,6 +95,13 @@ class ImmutableMultiDict[_Key, _Value](MultiMapping[_Key, _Value]):
         elif hasattr(value, 'items'):
             return list(value.items())
         return list(value)
+
+    def _check_args(
+            self,
+            *args: MultiMapping[_Key, _Value] | Mapping[_Key, _Value] | Iterable[tuple[_Key, _Value]]
+    ) -> None:
+        if not len(args) < 2:
+            raise AttributeError('Too many arguments.')
 
 
 class MultiDict(ImmutableMultiDict[Any, Any]):
