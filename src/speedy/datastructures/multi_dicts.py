@@ -123,20 +123,3 @@ class MultiDict(ImmutableMultiDict[Any, Any]):
             self.pop(key, None)
             return None
         super().__setitem__(key, values)
-
-
-# TODO: Replace the structure
-class MultiMixin:
-    """ Mixin providing common methods for multi dicts. """
-
-    # def multi_items(self) -> Iterator[tuple[str, T]]:
-    #     """ Get all keys and values, including duplicates. """
-    #     stack = []
-    #
-    #     for key in tuple(self):
-    #         if key in stack:
-    #             continue
-    #         stack.append(key)
-    #
-    #         for value in self.getall(key):
-    #             yield key, value
