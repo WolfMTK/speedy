@@ -1,44 +1,81 @@
-from typing import Mapping, Iterable, TypeVar
+from collections.abc import Mapping, Iterator
+from typing import Any
 
-from multidict import MultiMapping, CIMultiDict
-
-RawHeaders = TypeVar('RawHeaders')
+from speedy.types import RawHeaders, ScopeHeaders
 
 
-class Headers:
+class Headers(Mapping[str, str]):
     def __init__(
             self,
-            headers: Mapping[str, str] | Iterable[tuple[bytes, bytes]] | MultiMapping | None = None
+            headers: Mapping[str, str] | None = None,
+            raw: RawHeaders | None = None,
+            scope: ScopeHeaders | None = None
     ) -> None:
-        self._init_headers(headers)
-        self._headers_list: RawHeaders | None = None
+        self._raw: RawHeaders = self._get_raw(headers, raw, scope)
+
+    def __getitem__(self, item: str) -> str:
+        header_key = item.lower().encode('latin-1')
+        for key, value in self._raw:
+            if header_key == key:
+                return value.decode('latin-1')
+        raise KeyError(item)
+
+    def __contains__(self, item: Any) -> bool:
+        header_key = item.lower().encode('latin-1')
+        for key, _ in self._raw:
+            if header_key == key:
+                return True
+        return False
+
+    def __iter__(self) -> Iterator[Any]:
+        return iter(self._raw)
+
+    def __len__(self) -> int:
+        return len(self._raw)
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, Headers):
+            return False
+        return sorted(self._raw) == sorted(other._raw)
 
     @property
-    def raw(self) -> RawHeaders | None:
-        """ Raw header value. """
-        if not self._headers_list:
-            self._headers_list = self._encode_headers(
-                (key, value) for key in set(self) for value in self.getall(key)
-            )
-        return self._headers_list
+    def raw(self) -> RawHeaders:
+        return self._raw
 
-    def _encode_headers(self, headers: Iterable[tuple[str, str]]) -> RawHeaders:
-        return [(key.lower().encode('latin-1'), value.encode('latin-1')) for key, value in headers]
+    def keys(self) -> list[str]:
+        return [key.decode('latin-1') for key, _ in self._raw]
 
-    def _init_headers(
-            self,
-            headers: Mapping[str, str] | Iterable[tuple[bytes, bytes] | MultiMapping | None]
-    ) -> None:
-        if isinstance(headers, MultiMapping):
-            super().__init__(headers)
-        else:
-            headers_stack = {}
-            if headers:
-                if isinstance(headers, Mapping):
-                    headers_stack = headers
-                else:
-                    headers_stack = [(key.decode('latin-1'), value.decode('latin-1')) for key, value in headers]
-            super().__init__(CIMultiDict(headers_stack))
+    def values(self) -> list[str]:
+        return [value.decode('latin-1') for key, value in self._raw]
+
+    def items(self) -> list[tuple[str, str]]:
+        return [(key.decode('latin-1'),
+                 value.decode('latin-1')) for key, value in self._raw]
+
+    def getlist(self, key: str) -> list[str]:
+        header_key = key.lower().encode('latin-1')
+        return [value.decode('latin-1') for key, value in self._raw if header_key == key]
+
+    def _get_raw(self,
+                 headers: Mapping[str, str] | None = None,
+                 raw: RawHeaders | None = None,
+                 scope: ScopeHeaders | None = None) -> RawHeaders:
+        if headers is not None:
+            if raw is not None:
+                raise AttributeError('Cannot set both "headers" and "raw".')
+
+            if scope is not None:
+                raise AttributeError('Cannot set both "headers" and "scope".')
+
+            return [(key.lower().encode('latin-1'),
+                     value.encode('latin-1')) for key, value in headers.items()]
+        elif raw is not None:
+            if scope is not None:
+                raise AttributeError('Cannot set both "raw" and "scope".')
+            return raw
+        elif scope is not None:
+            return list(scope['headers'])
+        return []
 
 
 class MutableHeaders(Headers):
