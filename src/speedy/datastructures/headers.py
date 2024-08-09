@@ -153,7 +153,7 @@ class MutableHeaders(Headers):
         key_header = key.lower().encode('latin-1')
         value_header = value.encode('latin-1')
 
-        for index, (_key, _value) in enumerate(self):
+        for index, (_key, _value) in enumerate(self._raw):
             if key_header == _key:
                 return _value.decode('latin')
         self._raw.append((key_header, value_header))
