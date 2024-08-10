@@ -32,6 +32,13 @@ def test_headers_eq() -> None:
     assert headers != Headers(raw=[(b'a', b'123'), (b'a', b'456'), (b'b', b'789'), (b'c', b'455')])
 
 
+def test_headers_repr() -> None:
+    headers = Headers({'a': '123', 'b': '789'})
+    assert repr(headers) == "Headers({'a': '123', 'b': '789'})"
+    headers = Headers(raw=[(b'a', b'123'), (b'a', b'456'), (b'b', b'789')])
+    assert repr(headers) == "Headers(raw=[(b'a', b'123'), (b'a', b'456'), (b'b', b'789')])"
+
+
 def test_headers_raw() -> None:
     headers = Headers({'a': '123', 'b': '789'})
     assert headers['a'] == '123'
