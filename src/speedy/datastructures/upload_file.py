@@ -18,14 +18,18 @@ class UploadFile:
             headers: dict[str, str] | Headers | None = None
     ) -> None:
         self.filename = filename
-        self.headers = headers
-        self.file = SpooledTemporaryFile(max_size=size)
 
+        if isinstance(headers, dict):
+            self.headers = Headers(headers)
+        else:
+            self.headers = headers or Headers()
+
+        self.file = SpooledTemporaryFile(max_size=size)
         if file_data:
             self._write_file(file_data)
 
     def __repr__(self):
-        return f'{type(self).__name__}(filename={self.filename}, headers={self.headers})'
+        return f'{type(self).__name__}(filename={self.filename!r}, headers={self.headers!r})'
 
     @property
     def content_type(self) -> str | None:
@@ -53,6 +57,12 @@ class UploadFile:
         if self._is_memory:
             return await sync_to_thread(self.file.seek, offset)
         return self.file.seek(offset)
+
+    async def size(self) -> int:
+        """ Proxy for file tell. """
+        if self._is_memory:
+            return await sync_to_thread(self.file.tell)
+        return self.file.tell()
 
     async def close(self) -> None:
         """ Proxy for file close. """
