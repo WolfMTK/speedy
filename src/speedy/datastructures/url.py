@@ -1,11 +1,17 @@
+import sys
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import NamedTuple, Self, Any, Sequence
+from typing import NamedTuple, Any, Sequence
 from urllib.parse import SplitResult, urlsplit, urlunsplit, urlencode
 
 from speedy._parsers import parse_query_string
 from speedy.types.asgi_types import Scope
 from .multi_dicts import MultiDict
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 
 class Address(NamedTuple):

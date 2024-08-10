@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 from collections.abc import MutableMapping
-from typing import Any
+from typing import Any, TypeAlias
 
-type RawHeaders = list[tuple[bytes, bytes]]
+RawHeaders: TypeAlias = list[tuple[bytes, bytes]]
 
-type ScopeHeaders = MutableMapping[str, Any]
+ScopeHeaders: TypeAlias = MutableMapping[str, Any]
 
-type StateType = dict[str, Any]
+StateType: TypeAlias = dict[str, Any]

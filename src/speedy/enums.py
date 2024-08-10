@@ -1,7 +1,7 @@
-from enum import StrEnum, IntEnum
+from enum import Enum
 
 
-class HttpMethod(StrEnum):
+class HttpMethod(str, Enum):
     """ An enum for HTTP methods. """
 
     GET = 'GET'
@@ -14,7 +14,7 @@ class HttpMethod(StrEnum):
     OPTIONS = 'OPTIONS'
 
 
-class ScopeType(StrEnum):
+class ScopeType(str, Enum):
     """ An enum for the 'http' key stored under Scoped. """
 
     HTTP = 'http'
@@ -22,7 +22,7 @@ class ScopeType(StrEnum):
     LIFESPAN = 'lifespan'
 
 
-class MediaType(StrEnum):
+class MediaType(str, Enum):
     """ An enum for content-type header values. """
 
     JSON = 'application/json'
@@ -33,7 +33,7 @@ class MediaType(StrEnum):
     MESSAGEPACK = 'application/x-msgpack'
 
 
-class Match(IntEnum):
+class Match(int, Enum):
     NONE = 0
     PARTIAL = 1
     FULL = 2

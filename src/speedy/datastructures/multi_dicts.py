@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import KeysView, ValuesView, ItemsView
-from typing import Mapping, Iterable, Any
+from typing import Mapping, Iterable, Any, TypeVar
 
 from speedy.protocols import MultiMapping
 
+_Key = TypeVar('_Key')
+_Value = TypeVar('_Value')
 
-class ImmutableMultiDict[_Key, _Value](MultiMapping[_Key, _Value]):
+
+class ImmutableMultiDict(MultiMapping[_Key, _Value]):
     """ Immutable MultiDict. """
 
     def __init__(

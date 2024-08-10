@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import KeysView, ValuesView, ItemsView, Mapping, Iterator
-from typing import Any
+from typing import Any, TypeVar, Generic
+
+_Key = TypeVar('_Key')
+_Value = TypeVar('_Value')
 
 
-class MultiMapping[_Key, _Value](ABC):
+class MultiMapping(Generic[_Key, _Value], ABC):
     _dict: dict[_Key, _Value]
     _stack: list[tuple[Any, Any]]
 

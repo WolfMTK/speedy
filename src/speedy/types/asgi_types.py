@@ -29,20 +29,24 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 from __future__ import annotations
 
+import sys
 from typing import (
     Union,
     Literal,
     TypedDict,
     Iterable,
-    NotRequired,
     Any,
     Callable,
     Awaitable,
-    TypeAlias,
-    TYPE_CHECKING
+    TYPE_CHECKING,
 )
 
 from speedy.enums import HttpMethod, ScopeType
+
+if sys.version_info >= (3, 11):
+    from typing import NotRequired
+else:
+    from typing_extensions import NotRequired, TypeAlias
 
 if TYPE_CHECKING:
     from speedy.protocols import ASGIApplication

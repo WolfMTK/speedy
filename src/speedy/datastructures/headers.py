@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import sys
 from collections.abc import Mapping, Iterator
-from typing import Any, Self
+from typing import Any
 
 from speedy.types import RawHeaders, ScopeHeaders
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 
 class Headers(Mapping[str, str]):
