@@ -1,13 +1,14 @@
 from tempfile import SpooledTemporaryFile
-from typing import TypeVar
+from typing import TYPE_CHECKING
 
 from speedy.concurrency import sync_to_thread
 from speedy.constants import ONE_MEGABYTE
 
+if TYPE_CHECKING:
+    from speedy.datastructures import Headers
+
 TIME = 0
 SIZE_FILE = -1
-
-Headers = TypeVar('Headers')
 
 
 class UploadFile:
