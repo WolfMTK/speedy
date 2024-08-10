@@ -12,7 +12,7 @@ from .asgi_types import (
     HTTPSendMessage,
     WebSocketSendMessage,
 )
-from .structure_type import RawHeaders, ScopeHeaders
+from .structure_type import RawHeaders, ScopeHeaders, StateType
 
 __all__ = (
     'Scope',
@@ -28,5 +28,6 @@ __all__ = (
     'ASGIAppType',
     'SAMESITE',
     'RawHeaders',
-    'ScopeHeaders'
+    'ScopeHeaders',
+    'StateType'
 )
