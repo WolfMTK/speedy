@@ -40,6 +40,13 @@ class Headers(Mapping[str, str]):
             return False
         return sorted(self._raw) == sorted(other._raw)
 
+    def __repr__(self) -> str:
+        name = type(self).__name__
+        as_dict = dict(self.items())
+        if len(as_dict) == len(self):
+            return f'{name}({as_dict!r})'
+        return f'{name}(raw={self.raw!r})'
+
     @property
     def raw(self) -> RawHeaders:
         """ Get RawHeaders. """
