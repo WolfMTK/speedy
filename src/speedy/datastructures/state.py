@@ -1,6 +1,6 @@
-from typing import Any, TypeVar
+from typing import Any
 
-StateType = TypeVar('StateType', bound=dict[str, Any])
+from speedy.types import StateType
 
 
 class State:
