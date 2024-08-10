@@ -12,7 +12,7 @@ def test_basic_cookie_as_header() -> None:
     assert cookie.to_header() == 'Set-Cookie: key=""; Path=/; SameSite=lax'
 
 
-@travel(dt.datetime.now(dt.UTC), tick=False)
+@travel(dt.datetime.now(dt.timezone.utc), tick=False)
 def test_cookie_as_header() -> None:
     expires_sec = 123
     cookie = Cookie(
@@ -25,7 +25,7 @@ def test_cookie_as_header() -> None:
         httponly=True,
         samesite='strict'
     )
-    now = dt.datetime.now(dt.UTC)
+    now = dt.datetime.now(dt.timezone.utc)
     expected_expired = (now + dt.timedelta(seconds=expires_sec)).strftime('%a, %d %b %Y %H:%M:%S GMT')
     assert cookie.to_header() == (
         f'Set-Cookie: key=value; Domain=domain.com; expires={expected_expired}; HttpOnly; Path=/path; SameSite=strict; Secure'
