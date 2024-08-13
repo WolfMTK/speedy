@@ -1,6 +1,6 @@
 import pytest
 
-from speedy.datastructures.url import URL, URLComponents, URLPath
+from speedy.datastructures.url import URL, URLComponents, URLPath, QueryParams
 
 
 @pytest.mark.parametrize(
@@ -195,3 +195,49 @@ def test_url_from_scope() -> None:
     })
     assert url == 'https://example.org/path/to/somewhere?a=1'
     assert repr(url) == "URL('https://example.org/path/to/somewhere?a=1')"
+
+
+def test_query_params() -> None:
+    query = QueryParams('a=123&a=456&b=789')
+    assert 'a' in query
+    assert 'A' not in query
+    assert 'c' not in query
+    assert query['a'] == '456'
+    assert query.get('nope') is None
+    assert sorted(query.getList('a')) == sorted(['123', '456'])
+    assert sorted(query.items()) == sorted([('a', '456'), ('b', '789')])
+    assert repr(query) == "QueryParams('a=123&a=456&b=789')"
+
+
+def test_query_params_repr() -> None:
+    query = QueryParams('a=123&b=456')
+    assert repr(query) == "QueryParams('a=123&b=456')"
+    query = QueryParams({'a': '123', 'b': '456'})
+    assert repr(query) == "QueryParams('a=123&b=456')"
+    query = QueryParams([('a', 123), ('b', 456)])
+    assert repr(query) == "QueryParams('a=123&b=456')"
+
+
+def test_query_params_eq() -> None:
+    assert QueryParams({'a': '123', 'b': '456'}) == QueryParams([('a', '123'), ('b', '456')])
+    assert QueryParams({'a': '123', 'b': '456'}) == QueryParams({'a': '123', 'b': '456'})
+    assert QueryParams({'a': '123', 'b': '456'}) == QueryParams('a=123&b=456')
+    assert QueryParams({'a': '123', 'b': '456'}) == QueryParams({'b': '456', 'a': '123'})
+    assert QueryParams() == QueryParams([])
+    assert QueryParams([('a', '123'), ('a', '456')]) == QueryParams('a=123&a=456')
+    assert QueryParams({'a': '123', 'b': '456'}) != 'null'
+    query = QueryParams([('a', '123'), ('b', '456')])
+    assert QueryParams(query) == query
+
+
+def test_url_blank_params() -> None:
+    query = QueryParams('a=123&abc&def&b=456')
+    assert 'a' in query
+    assert 'abc' in query
+    assert 'def' in query
+    assert 'b' in query
+    value = query.get('abc')
+    assert value is not None
+    assert len(value) == 0
+    assert len(query['a']) == 3
+    assert sorted(query.keys()) == sorted(['a', 'abc', 'def', 'b'])
