@@ -2,11 +2,11 @@ import sys
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import NamedTuple, Any, Sequence
-from urllib.parse import SplitResult, urlsplit, urlunsplit, urlencode
+from urllib.parse import SplitResult, urlsplit, urlunsplit, urlencode, parse_qsl
 
 from speedy._parsers import parse_query_string
 from speedy.types.asgi_types import Scope
-from .multi_dicts import MultiDict
+from .multi_dicts import MultiDict, ImmutableMultiDict
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -293,3 +293,29 @@ class URLPath:
         url = self.base if isinstance(self.base, URL) else URL(self.base)
         path = url.path.rstrip('/') + str(self.path)
         return str(URL.from_components(URLComponents(scheme=url.scheme, netloc=url.netloc, path=path)))
+
+
+class QueryParams(ImmutableMultiDict[str, str]):
+    def __init__(
+            self,
+            *args: ImmutableMultiDict[Any, Any] | list[tuple[Any, Any]] | str | bytes,
+            **kwargs: Any
+    ) -> None:
+        self._check_args(*args)
+
+        value = args[0] if args else []
+        if isinstance(value, str):
+            args = (parse_qsl(value, keep_blank_values=True),)
+        elif isinstance(value, bytes):
+            args = (parse_qsl(value.decode('latin-1'), keep_blank_values=True),)
+        super.__init__(*args, **kwargs)
+
+        self._stack = [(str(key), str(value)) for key, value in self._stack]
+        self._dict = {str(key): str(value) for key, value in self._dict.items()}
+
+    def __str__(self) -> str:
+        return urlencode(self._stack)
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({str(self)!r})'
+
