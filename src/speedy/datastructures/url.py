@@ -308,7 +308,7 @@ class QueryParams(ImmutableMultiDict[str, str]):
             args = (parse_qsl(value, keep_blank_values=True),)
         elif isinstance(value, bytes):
             args = (parse_qsl(value.decode('latin-1'), keep_blank_values=True),)
-        super.__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self._stack = [(str(key), str(value)) for key, value in self._stack]
         self._dict = {str(key): str(value) for key, value in self._dict.items()}
