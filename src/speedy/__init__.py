@@ -1,6 +1,6 @@
 from .background import BackgroundTask, BackgroundTasks
 from .enums import MediaType, HttpMethod, ScopeType, Match
-from .application import Speedy
+from .app import Speedy
 
 __all__ = (
     'MediaType',
