@@ -1,4 +1,4 @@
-from .application import ASGIApplication
+from .app import ASGIApplication
 from .middleware import MiddlewareProtocol, AbstractMiddleware
 from .multi_dicts import MultiMapping
 
