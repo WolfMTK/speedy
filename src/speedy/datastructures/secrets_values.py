@@ -3,6 +3,7 @@ from typing import Generic, TypeVar, Union
 
 SecretType = TypeVar('SecretType', bound=Union[str, bytes])
 
+
 class BaseSecret(ABC, Generic[SecretType]):
     def __init__(self, value: SecretType) -> None:
         self._value = value
