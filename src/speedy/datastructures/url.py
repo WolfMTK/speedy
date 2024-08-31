@@ -2,7 +2,7 @@ import sys
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import NamedTuple, Any, Sequence
-from urllib.parse import SplitResult, urlsplit, urlunsplit, urlencode, parse_qsl
+from urllib.parse import SplitResult, urlsplit, urlunsplit, urlencode
 
 from speedy._parsers import parse_query_string
 from speedy.types.asgi_types import Scope
@@ -305,9 +305,9 @@ class QueryParams(ImmutableMultiDict[str, str]):
 
         value = args[0] if args else []
         if isinstance(value, str):
-            args = (parse_qsl(value, keep_blank_values=True),)
+            args = (parse_query_string(value),)
         elif isinstance(value, bytes):
-            args = (parse_qsl(value.decode('latin-1'), keep_blank_values=True),)
+            args = (parse_query_string(value),)
         super().__init__(*args, **kwargs)
 
         self._stack = [(str(key), str(value)) for key, value in self._stack]
@@ -318,4 +318,3 @@ class QueryParams(ImmutableMultiDict[str, str]):
 
     def __repr__(self) -> str:
         return f'{type(self).__name__}({str(self)!r})'
-
