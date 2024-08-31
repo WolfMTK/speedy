@@ -14,12 +14,19 @@ def parse_query_string(query: bytes | str) -> tuple[tuple[str, str], ...]:
 @lru_cache(1024)
 def parse_cookie_string(cookie_string: str) -> dict[str, str]:
     """ Parse a cookie string info a dict of key value parse. """
-    cookies = [cookie.split("=", 1) if "=" in cookie else ("", cookie) for cookie in cookie_string.split(";")]
+    cookies = [
+        cookie.split("=", 1)
+        if "=" in cookie
+        else ("", cookie)
+        for cookie in cookie_string.split(";")
+    ]
     output: dict[str, str] = {
         k: unquote(unquote_cookie(v))
         for k, v in filter(
             lambda x: x[0] or x[1],
-            ((k.strip(), v.strip()) for k, v in cookies),
+            (
+                (k.strip(), v.strip()) for k, v in cookies
+            ),
         )
     }
     return output
