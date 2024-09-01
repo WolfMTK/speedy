@@ -28,8 +28,7 @@ def test_url_path_repr(base: str, path: str) -> None:
     assert repr(URLPath(path, base)) == f"URLPath(path={path!r}, base={base!r})"
 
 
-def test_url() -> None:
-    url = URL('https://example.org:8000/path/to/somewhere?abc=123#anchor')
+def _check_url(url: URL) -> None:
     assert url.scheme == 'https'
     assert url.hostname == 'example.org'
     assert url.port == 8000
@@ -39,6 +38,15 @@ def test_url() -> None:
     assert url.path == '/path/to/somewhere'
     assert url.query == 'abc=123'
     assert url.fragment == "anchor"
+
+
+def test_url() -> None:
+    url = URL('https://example.org:8000/path/to/somewhere?abc=123#anchor')
+    _check_url(url)
+
+    url_path = URLPath('/path/to/somewhere?abc=123#anchor', 'https://example.org:8000')
+    url = URL(url_path)
+    _check_url(url)
 
 
 @pytest.mark.parametrize(
