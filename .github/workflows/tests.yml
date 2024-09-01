@@ -1,38 +1,39 @@
-name: Test
-
-on:
-  push:
-    branches:
-      - "main"
-      - "master"
-      - "dev"
-      - "develop"
-  pull_request:
-    branches:
-      - "main"
-      - "master"
-
-jobs:
-  tests:
-    name: "Python ${{ matrix.python-version }}"
-    runs-on: "ubuntu-latest"
-
-    strategy:
-      matrix:
-        python-version: ["3.12", "3.11", "3.10"]
-
-    steps:
-      - uses: "actions/checkout@v4"
-      - uses: "actions/setup-python@v5"
-        with:
-          python-version: "${{ matrix.python-version }}"
-          allow-prereleases: true
-      - name: "Install dependencies"
-        run: | 
-          python -m pip install -e .[dev]
-# TODO: Add a linter after creating the application
-#          python -m pip install -e .[linter]
-#      - name: "Run linting checks"
-#        run: "python -m mypy ./src"
-      - name: "Run tests"
-        run: "python -m pytest"
+# TODO: Uncomment after the application has been created
+#name: Test
+#
+#on:
+#  push:
+#    branches:
+#      - "main"
+#      - "master"
+#      - "dev"
+#      - "develop"
+#  pull_request:
+#    branches:
+#      - "main"
+#      - "master"
+#
+#jobs:
+#  tests:
+#    name: "Python ${{ matrix.python-version }}"
+#    runs-on: "ubuntu-latest"
+#
+#    strategy:
+#      matrix:
+#        python-version: ["3.12", "3.11", "3.10"]
+#
+#    steps:
+#      - uses: "actions/checkout@v4"
+#      - uses: "actions/setup-python@v5"
+#        with:
+#          python-version: "${{ matrix.python-version }}"
+#          allow-prereleases: true
+#      - name: "Install dependencies"
+#        run: |
+#          python -m pip install -e .[dev]
+## TODO: Add a linter after creating the application
+##          python -m pip install -e .[linter]
+##      - name: "Run linting checks"
+##        run: "python -m mypy ./src"
+#      - name: "Run tests"
+#        run: "python -m pytest"
