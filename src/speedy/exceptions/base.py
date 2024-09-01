@@ -2,9 +2,5 @@ class ASGIApplicationException(Exception):
     pass
 
 
-class EmptyException(ASGIApplicationException):
-    pass
-
-
-class ConvertorTypeException(ASGIApplicationException):
+class ConnectionException(Exception):
     pass
