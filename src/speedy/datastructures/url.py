@@ -5,8 +5,8 @@ from typing import NamedTuple, Any, Sequence
 from urllib.parse import SplitResult, urlsplit, urlunsplit, urlencode
 
 from speedy._parsers import parse_query_string
+from speedy.datastructures.multi_dicts import MultiDict, ImmutableMultiDict
 from speedy.types.asgi_types import Scope
-from .multi_dicts import MultiDict, ImmutableMultiDict
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -46,7 +46,7 @@ class URL:
 
     url_components: URLComponents
 
-    def __new__(cls, url: str | SplitResult) -> Self:
+    def __new__(cls, url: 'str | SplitResult | URLPath') -> Self:
         """ Create a new instance. """
         return cls._new(url)
 
@@ -108,9 +108,12 @@ class URL:
 
     @classmethod
     @lru_cache
-    def _new(cls, url: str | SplitResult) -> Self:
+    def _new(cls, url: 'str | SplitResult | URLPath') -> Self:
         instance = super().__new__(cls)
         instance._parser_url = None
+
+        if isinstance(url, URLPath):
+            url = str(url)
 
         if isinstance(url, str):
             result = urlsplit(url)
