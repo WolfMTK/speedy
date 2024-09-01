@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import KeysView, ValuesView, ItemsView
 from typing import Mapping, Iterable, Any, TypeVar
 
-from speedy.protocols import MultiMapping
+from speedy.protocols.multi_dicts import MultiMapping
 
 _Key = TypeVar('_Key')
 _Value = TypeVar('_Value')
