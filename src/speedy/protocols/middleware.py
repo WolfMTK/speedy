@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Protocol, runtime_checkable, ParamSpec
 
-from speedy.protocols import ASGIApplication
+from speedy.protocols.app import ASGIApplication
 from speedy.types import ASGISendCallable, ASGIReceiveCallable, Scope
 
 P = ParamSpec('P')
