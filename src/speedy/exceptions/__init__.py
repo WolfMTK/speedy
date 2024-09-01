@@ -1,11 +1,9 @@
-from .http_exceptions import HTTPException, InternalServerException
-from .websocket_exceptions import WebSocketException, WebSocketDisconnect
-from .response import InvalidJSONLibrary
+from .base import ASGIApplicationException, ConnectionException
+from .connection import SessionException, AuthException
 
 __all__ = (
-    'HTTPException',
-    'InternalServerException',
-    'WebSocketException',
-    'WebSocketDisconnect',
-    'InvalidJSONLibrary'
+    'ASGIApplicationException',
+    'SessionException',
+    'ConnectionException',
+    'AuthException'
 )
