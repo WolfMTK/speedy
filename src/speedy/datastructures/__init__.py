@@ -3,7 +3,7 @@ from .headers import Headers, MutableHeaders
 from .multi_dicts import ImmutableMultiDict, MultiDict
 from .state import State
 from .upload_file import UploadFile
-from .url import URL, URLPath, QueryParams
+from .url import URL, URLPath, QueryParams, Address
 
 __all__ = (
     'URL',
@@ -15,5 +15,6 @@ __all__ = (
     'State',
     'URLPath',
     'Cookie',
-    'QueryParams'
+    'QueryParams',
+    'Address',
 )
