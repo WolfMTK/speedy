@@ -1,5 +1,5 @@
 from .background import BackgroundTask, BackgroundTasks
-from .enums import MediaType, HttpMethod, ScopeType, Match
+from .enums import MediaType, HttpMethod, ScopeType, RequestEncodingType
 from .app import Speedy
 
 __all__ = (
@@ -9,5 +9,5 @@ __all__ = (
     'BackgroundTask',
     'BackgroundTasks',
     'Speedy',
-    'Match'
+    'RequestEncodingType'
 )
