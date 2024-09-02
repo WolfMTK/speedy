@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import KeysView, ValuesView, ItemsView
 from typing import Mapping, Iterable, Any, TypeVar
 
+from speedy.datastructures.upload_file import UploadFile
 from speedy.protocols.multi_dicts import MultiMapping
 
 _Key = TypeVar('_Key')
@@ -126,3 +127,13 @@ class MultiDict(ImmutableMultiDict[Any, Any]):
             self.pop(key, None)
             return None
         super().__setitem__(key, values)
+
+
+class FormMultiDict(ImmutableMultiDict):
+    """ MultiDict for form data. """
+
+    async def close(self) -> None:
+        """ Close all files in the multi-dict. """
+        for _, value in self.multi_items():
+            if isinstance(value, UploadFile):
+                await value.close()
