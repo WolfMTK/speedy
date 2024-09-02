@@ -4,7 +4,7 @@ from speedy._parsers import parse_cookie_string
 from speedy.datastructures import URL, Headers, QueryParams, Address, State
 from speedy.exceptions import SessionException, AuthException
 from speedy.protocols.app import ASGIApplication
-from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable
+from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable, Message
 
 AuthT = TypeVar('AuthT')
 UserT = TypeVar('UserT')
@@ -16,7 +16,7 @@ async def empty_receive() -> NoReturn:
     raise RuntimeError()
 
 
-async def empty_send() -> NoReturn:
+async def empty_send(_: Message) -> NoReturn:
     """ Serves as a placeholder send function. """
     raise RuntimeError()
 
