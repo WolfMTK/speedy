@@ -137,6 +137,7 @@ class ASGIConnection(Generic[UserT, AuthT, StateT]):
         return self._state
 
     def url_for(self, name: str, **path_params: Any) -> URL:
+        """ Return the url for a given route handler name. """
         app: ASGIApplication = self.scope['app']
         url_path = app.route_reverse(name, **path_params)
         return URL(url_path)
