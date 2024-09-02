@@ -31,20 +31,20 @@ def test_parse_query_string() -> None:
 
 
 @pytest.mark.parametrize(
-    "cookie_string, expected",
+    'cookie_string, expected',
     (
-            ("ABC    = 123;   efg  =   456", {"ABC": "123", "efg": "456"}),
-            ("foo= ; bar=", {"foo": "", "bar": ""}),
-            ('foo="bar=123456789&name=moisheZuchmir"', {"foo": "bar=123456789&name=moisheZuchmir"}),
-            ("email=%20%22%2c%3b%2f", {"email": ' ",;/'}),
-            ("foo=%1;bar=bar", {"foo": "%1", "bar": "bar"}),
-            ("foo=bar;fizz  ; buzz", {"": "buzz", "foo": "bar"}),
-            ("  fizz; foo=  bar", {"": "fizz", "foo": "bar"}),
-            ("foo=false;bar=bar;foo=true", {"bar": "bar", "foo": "true"}),
-            ("foo=;bar=bar;foo=boo", {"bar": "bar", "foo": "boo"}),
+            ('ABC    = 123;   efg  =   456', {'ABC': '123', 'efg': '456'}),
+            ('foo= ; bar=', {'foo': '', 'bar': ''}),
+            ('foo="bar=123456789&name=moisheZuchmir"', {'foo': 'bar=123456789&name=moisheZuchmir'}),
+            ('email=%20%22%2c%3b%2f', {'email': ' ",;/'}),
+            ('foo=%1;bar=bar', {'foo': '%1', 'bar': 'bar'}),
+            ('foo=bar;fizz  ; buzz', {'': 'buzz', 'foo': 'bar'}),
+            ('  fizz; foo=  bar', {'': 'fizz', 'foo': 'bar'}),
+            ('foo=false;bar=bar;foo=true', {'bar': 'bar', 'foo': 'true'}),
+            ('foo=;bar=bar;foo=boo', {'bar': 'bar', 'foo': 'boo'}),
             (
-                    Cookie(key="abc", value="123", path="/head", domain="localhost").to_header(header=""),
-                    {"Domain": "localhost", "Path": "/head", "SameSite": "lax", "abc": "123"},
+                    Cookie(key='abc', value='123', path='/head', domain='localhost').to_header(header=''),
+                    {'Domain': 'localhost', 'Path': '/head', 'SameSite': 'lax', 'abc': '123'},
             ),
     ),
 )
