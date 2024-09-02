@@ -4,3 +4,7 @@ class ASGIApplicationException(Exception):
 
 class ConnectionException(Exception):
     pass
+
+
+class ValidationException(Exception):
+    pass

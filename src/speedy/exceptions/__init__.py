@@ -1,9 +1,12 @@
-from .base import ASGIApplicationException, ConnectionException
-from .connection import SessionException, AuthException
+from .base import ASGIApplicationException, ConnectionException, ValidationException
+from .connection import SessionException, AuthException, RequestException, InternalServerException
 
 __all__ = (
     'ASGIApplicationException',
     'SessionException',
     'ConnectionException',
-    'AuthException'
+    'AuthException',
+    'RequestException',
+    'InternalServerException',
+    'ValidationException',
 )
