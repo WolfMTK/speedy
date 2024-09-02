@@ -7,3 +7,11 @@ class SessionException(ConnectionException):
 
 class AuthException(ConnectionException):
     pass
+
+
+class RequestException(ConnectionException):
+    pass
+
+
+class InternalServerException(ConnectionException):
+    pass
