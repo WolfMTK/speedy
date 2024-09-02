@@ -17,5 +17,4 @@ import pytest
     )
 )
 def test_parse_content_header(value_content: str, expected: tuple[str, dict[str, str]]) -> None:
-    print(parse_content_header(value_content), expected)
     assert parse_content_header(value_content) == expected
