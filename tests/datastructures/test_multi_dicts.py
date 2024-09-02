@@ -1,4 +1,6 @@
-from speedy.datastructures import ImmutableMultiDict, MultiDict
+from pytest_mock import MockFixture
+
+from speedy.datastructures import ImmutableMultiDict, MultiDict, UploadFile, FormMultiDict
 
 ZERO = 0
 
@@ -183,3 +185,17 @@ def test_multidict_get() -> None:
 def test_multidict_eq() -> None:
     multidict = MultiDict([('a', '123'), ('a', '456',)])
     assert MultiDict(multidict) == multidict
+
+
+async def test_form_multi_dict_close(mocker: MockFixture) -> None:
+    close = mocker.patch('speedy.datastructures.multi_dicts.UploadFile.close')
+
+    multi = FormMultiDict(
+        [
+            ('foo', UploadFile(filename='foo')),
+            ('bar', UploadFile(filename='bar')),
+        ]
+    )
+    await multi.close()
+
+    assert close.call_count == 2
