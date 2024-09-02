@@ -1,5 +1,6 @@
 import re
 from collections import defaultdict
+from dataclasses import dataclass, field
 from email.utils import decode_rfc2231
 from typing import Any
 from urllib.parse import unquote
@@ -37,7 +38,17 @@ class _Parser:
         return form_parts
 
 
+@dataclass
+class _FormPart:
+    file_name: None | str = field(default=None)
+    charset: str = 'utf-8'
+    field_name: None | str = field(default=None)
+    headers: list[tuple[str, str]] = field(default_factory=list)
+
+
 class MultiPartFormParser(_Parser):
+    """ The parser multipart form data. """
+
     def __init__(
             self,
             body: bytes,
@@ -49,50 +60,58 @@ class MultiPartFormParser(_Parser):
         self.multipart_limit = multipart_limit
 
     def parser(self) -> dict[str, Any,]:
+        """ Parse multipart form data. """
         fields = defaultdict(list)
 
-        for form_part in self.parse_body():
-            file_name = None
-            content_charset = "utf-8"
-            field_name = None
+        for value in self.parse_body():
+            form_part = _FormPart()
             line_index = 2
             line_end_index = 0
-            headers: list[tuple[str, str]] = []
 
             while line_end_index != -1:
-                line_end_index = form_part.find(b"\r\n", line_index)
-                form_line = form_part[line_index:line_end_index].decode("utf-8")
-
+                line_end_index = value.find(b"\r\n", line_index)
+                form_line = value[line_index:line_end_index].decode("utf-8")
                 if not form_line:
                     break
-
                 line_index = line_end_index + 2
                 colon_index = form_line.index(":")
                 current_idx = colon_index + 2
                 form_header_field = form_line[:colon_index].lower()
                 form_header_value, form_parameters = parse_content_header(form_line[current_idx:])
                 if form_header_field == "content-disposition":
-                    field_name = form_parameters.get("name")
-                    file_name = form_parameters.get("filename")
-
-                    if file_name is None and (filename_with_asterisk := form_parameters.get("filename*")):
-                        encoding, _, value = decode_rfc2231(filename_with_asterisk)
-                        file_name = unquote(value, encoding=encoding or content_charset)
-
+                    self._encode_content_disposition(form_part, form_parameters)
                 elif form_header_field == "content-type":
-                    content_charset = form_parameters.get("charset", "utf-8")
-                headers.append((form_header_field, form_header_value))
+                    form_part.charset = form_parameters.get("charset", "utf-8")
+                form_part.headers.append((form_header_field, form_header_value))
+            if form_part.field_name:
+                self._set_fields(form_part, fields, value, line_index)
+        return {key: value if len(value) > 1 else value[0] for key, value in fields.items()}
 
-            if field_name:
-                post_data = form_part[line_index:].rstrip(b'\r\n--').lstrip(b'\r\n')
+    def _set_fields(
+            self,
+            form_part: _FormPart,
+            fields: defaultdict[str, list[Any]],
+            form: bytes,
+            line_index: int
+    ) -> None:
+        post_data = form[line_index:].rstrip(b'\r\n--').lstrip(b'\r\n')
+        if form_part.file_name:
+            form_file = UploadFile(filename=form_part.file_name,
+                                   file_data=post_data,
+                                   headers=dict(form_part.headers))
+            fields[form_part.field_name].append(form_file)
+        elif post_data:
+            fields[form_part.field_name].append(post_data.decode(form_part.charset))
+        else:
+            fields[form_part.field_name].append(None)
 
-                if file_name:
-                    form_file = UploadFile(filename=file_name,
-                                           file_data=post_data,
-                                           headers=dict(headers))
-                    fields[field_name].append(form_file)
-                elif post_data:
-                    fields[field_name].append(post_data.decode(content_charset))
-                else:
-                    fields[field_name].append(None)
-        return {k: v if len(v) > 1 else v[0] for k, v in fields.items()}
+    def _encode_content_disposition(
+            self,
+            form_part: _FormPart,
+            form_parameters: dict[str, str]
+    ) -> None:
+        form_part.field_name = form_parameters.get("name")
+        form_part.file_name = form_parameters.get("filename")
+        if form_part.file_name is None and (filename_with_asterisk := form_parameters.get("filename*")):
+            encoding, _, value = decode_rfc2231(filename_with_asterisk)
+            form_part.file_name = unquote(value, encoding=encoding or form_part.charset)
