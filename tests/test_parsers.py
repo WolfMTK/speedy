@@ -26,7 +26,7 @@ def test_parse_utf8_form_data() -> None:
     }
 
 
-def test_single_value():
+def test_parse_form_data():
     result = parse_url_encoded_form_data(
         encoded_data=urlencode(
             [
