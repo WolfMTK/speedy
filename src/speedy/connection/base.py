@@ -1,14 +1,11 @@
-from typing import TypeVar, Generic, NoReturn, Any
+from typing import Generic, NoReturn, Any
 
 from speedy._parsers import parse_cookie_string
 from speedy.datastructures import URL, Headers, QueryParams, Address, State
 from speedy.exceptions import SessionException, AuthException
 from speedy.protocols.app import ASGIApplication
+from speedy.protocols.connection import UserT, AuthT, StateT
 from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable, Message
-
-AuthT = TypeVar('AuthT')
-UserT = TypeVar('UserT')
-StateT = TypeVar('StateT')
 
 
 async def empty_receive() -> NoReturn:
