@@ -1,5 +1,12 @@
 from .base import ASGIApplicationException, ConnectionException, ValidationException
-from .connection import SessionException, AuthException, RequestException, InternalServerException
+from .connection import (
+    SessionException,
+    AuthException,
+    RequestException,
+    InternalServerException,
+    WebSocketException,
+    WebSocketDisconnect
+)
 
 __all__ = (
     'ASGIApplicationException',
@@ -9,4 +16,6 @@ __all__ = (
     'RequestException',
     'InternalServerException',
     'ValidationException',
+    'WebSocketException',
+    'WebSocketDisconnect',
 )

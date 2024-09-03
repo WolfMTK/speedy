@@ -15,3 +15,11 @@ class RequestException(ConnectionException):
 
 class InternalServerException(ConnectionException):
     pass
+
+
+class WebSocketException(ConnectionException):
+    pass
+
+
+class WebSocketDisconnect(WebSocketException):
+    pass
