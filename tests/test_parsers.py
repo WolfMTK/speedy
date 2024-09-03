@@ -3,8 +3,51 @@ from urllib.parse import urlencode
 
 import pytest
 
-from speedy._parsers import parse_query_string, parse_cookie_string
+from speedy._parsers import parse_query_string, parse_cookie_string, parse_url_encoded_form_data
 from speedy.datastructures import Cookie
+
+
+def test_parse_utf8_form_data() -> None:
+    result = parse_url_encoded_form_data(
+        encoded_data=urlencode(
+            [
+                ('name', 'Мария'),
+                ('city', 'São Paulo'),
+                ('language', '日本語'),
+                ('emoji', '😊')
+            ]
+        ).encode()
+    )
+    assert result == {
+        'name': 'Мария',
+        'city': 'São Paulo',
+        'language': '日本語',
+        'emoji': '😊'
+    }
+
+
+def test_single_value():
+    result = parse_url_encoded_form_data(
+        encoded_data=urlencode(
+            [
+                ('value', '10'),
+                ('value', '12'),
+                ('veggies', ['tomato', 'potato']),
+                ('method', ['get', 'set']),
+                ('calories', '90.13'),
+                ('healthy', 'true'),
+                ('polluting', 'false')
+            ]
+        ).encode()
+    )
+    assert result == {
+        'value': ['10', '12'],
+        'veggies': "['tomato', 'potato']",
+        'method': "['get', 'set']",
+        'calories': '90.13',
+        'healthy': 'true',
+        'polluting': 'false'
+    }
 
 
 def _parse_query_string(query: dict[str, Any], query_string: bytes | str) -> None:
