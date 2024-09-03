@@ -291,8 +291,6 @@ LifeSpanReceiveMessage: TypeAlias = Union[
 
 Scope: TypeAlias = Union[HttpScope, WebSocketScope]
 
-Message: TypeAlias = Union[HTTPReceiveMessage, WebSocketReceiveMessage]
-
 ASGIReceiveEvent: TypeAlias = Union[
     HTTPReceiveMessage,
     WebSocketReceiveMessage
