@@ -4,13 +4,15 @@ from .asgi_types import (
     ASGIReceiveCallable,
     ASGISendCallable,
     WebSocketReceiveMessage,
-    Message,
     Method,
     HttpScope,
     HTTPReceiveMessage,
     WebSocketScope,
     HTTPSendMessage,
     WebSocketSendMessage,
+    ASGISendEvent,
+    ASGIReceiveEvent,
+    WebSocketSendEvent,
 )
 from .structure_type import RawHeaders, ScopeHeaders, StateType
 
@@ -18,7 +20,6 @@ __all__ = (
     'Scope',
     'ASGIReceiveCallable',
     'ASGISendCallable',
-    'Message',
     'Method',
     'HttpScope',
     'HTTPReceiveMessage',
@@ -29,5 +30,8 @@ __all__ = (
     'SAMESITE',
     'RawHeaders',
     'ScopeHeaders',
-    'StateType'
+    'StateType',
+    'ASGISendEvent',
+    'ASGIReceiveEvent',
+    'WebSocketSendEvent',
 )
