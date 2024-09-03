@@ -5,9 +5,10 @@ from typing import Generic, Any
 from speedy import RequestEncodingType
 from speedy._multipart import parse_content_header, MultiPartFormParser
 from speedy._parsers import parse_url_encoded_form_data
-from speedy.connection.base import UserT, AuthT, StateT, ASGIConnection, empty_receive, empty_send
+from speedy.connection.base import ASGIConnection, empty_receive, empty_send
 from speedy.datastructures import FormMultiDict
 from speedy.exceptions import RequestException, InternalServerException
+from speedy.protocols.connection import UserT, AuthT, StateT
 from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable, Method
 
 SERVER_PUSH_HEADERS = {
