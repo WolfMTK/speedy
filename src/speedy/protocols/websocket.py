@@ -1,14 +1,15 @@
 from abc import abstractmethod
-from typing import Protocol, Any, Literal, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Protocol, Any, Literal
 
 from speedy.datastructures import Headers
 from speedy.protocols.connection import Connection, StateT, AuthT, UserT
 from speedy.types import ASGIReceiveCallable, ASGISendCallable
 
-WebSocketMode = Literal['text', 'binary']
+WebSocketMode = Literal['text', 'bytes']
 
 
-class AbstractWebsocket(Protocol[UserT, AuthT, StateT], Connection[UserT, AuthT, StateT]):
+class AbstractWebSocket(Protocol[UserT, AuthT, StateT], Connection[UserT, AuthT, StateT]):
     @abstractmethod
     def receive_wrapper(self, receive: ASGIReceiveCallable) -> ASGIReceiveCallable: ...
 
@@ -21,6 +22,9 @@ class AbstractWebsocket(Protocol[UserT, AuthT, StateT], Connection[UserT, AuthT,
             subprotocol: str | None = None,
             headers: Headers | dict[str, Any] | list[tuple[bytes, bytes]] | None = None
     ) -> None: ...
+
+    @abstractmethod
+    async def receive_data(self, mode: WebSocketMode) -> str | bytes: ...
 
     @abstractmethod
     async def receive_text(self) -> str: ...
@@ -41,7 +45,10 @@ class AbstractWebsocket(Protocol[UserT, AuthT, StateT], Connection[UserT, AuthT,
     async def iter_json(self, mode: WebSocketMode = 'text') -> AsyncIterator[Any]: ...
 
     @abstractmethod
-    async def send_text(self, data: bytes | str, encoding: str = 'utf-8') -> None: ...
+    async def send_data(self, data: str | bytes, mode: WebSocketMode = 'text', encoding: str = 'utf-8') -> None: ...
+
+    @abstractmethod
+    async def send_text(self, data: bytes, encoding: str = 'utf-8') -> None: ...
 
     @abstractmethod
     async def send_bytes(self, data: bytes, encoding: str = 'utf-8') -> None: ...
