@@ -97,6 +97,7 @@ class Response(Generic[T]):
         self.cookies = [val for val in self.cookies if val != cookie]
         self.cookies.append(cookie)
 
+    # TODO: add JSON processing
     def render(self, content: Any) -> bytes:
         """ Handle the rendering of content into a bytes string. """
         if content is None:
