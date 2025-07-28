@@ -29,16 +29,16 @@ classifiers = [
 
 [project.optional-dependencies]
 ujson = ["ujson<=5.10.0"]
-orjson = ["orjson<=3.10.18"]
+orjson = ["orjson<=3.11.1"]
 dev = [
     "covdefaults",
     "pytest<=8.4.1",
     "ujson<=5.10.0",
-    "orjson<=3.10.18",
+    "orjson<=3.11.1",
     "httpx<=0.28.1",
     "pytest-cov",
     "time-machine<=2.16.0",
-    "pytest-asyncio<=1.0.0",
+    "pytest-asyncio<=1.1.0",
     "pytest-mock<=3.14.1"
 ]
 
