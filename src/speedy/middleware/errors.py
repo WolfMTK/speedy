@@ -1,6 +1,6 @@
 from speedy.enums import ScopeType
 from speedy.protocols.middleware import AbstractMiddleware
-from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable, Message
+from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable
 from speedy.types.application import ASGIAppType
 
 
@@ -14,9 +14,3 @@ class ServerErrorMiddleware(AbstractMiddleware):
             await self.app(scope, receive, send)
             return None
 
-        async def _send(message: Message) -> None:
-            nonlocal send
-
-            if message['type'] == 'http.response.start':
-                self.started_response = True
-            await send(message)  # type: ignore[arg-type]
