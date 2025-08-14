@@ -34,7 +34,7 @@ dev = [
     "orjson<=3.11.1",
     "httpx<=0.28.1",
     "pytest-cov",
-    "time-machine<=2.16.0",
+    "time-machine<=2.17.0",
     "pytest-asyncio<=1.1.0",
     "pytest-mock<=3.14.1",
     "tox>=4.28.4",
