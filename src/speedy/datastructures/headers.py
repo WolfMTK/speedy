@@ -1,15 +1,7 @@
-from __future__ import annotations
-
-import sys
 from collections.abc import Mapping, Iterator
 from typing import Any
 
 from speedy.types import RawHeaders, ScopeHeaders
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
 
 
 class Headers(Mapping[str, str]):
@@ -76,7 +68,7 @@ class Headers(Mapping[str, str]):
         header_key = key.lower().encode('latin-1')
         return [value.decode('latin-1') for key, value in self._raw if header_key == key]
 
-    def mutablecopy(self) -> MutableHeaders:
+    def mutablecopy(self) -> "MutableHeaders":
         return MutableHeaders(raw=self.raw)
 
     def _get_raw(self,
@@ -134,13 +126,13 @@ class MutableHeaders(Headers):
         for index in indexes:
             del self._raw[index]
 
-    def __ior__(self, other: Mapping[str, str]) -> Self:
+    def __ior__(self, other: Mapping[str, str]) -> "MutableHeaders":
         if not isinstance(other, Mapping):
             raise TypeError(f'Expected a mapping but got {type(other).__name__}')
         self.update(other)
         return self
 
-    def __or__(self, other: Mapping[str, str]) -> Self:
+    def __or__(self, other: Mapping[str, str]) -> "MutableHeaders":
         if not isinstance(other, Mapping):
             raise TypeError(f'Expected a mapping but got {type(other).__name__}')
         mutable_headers = self.mutablecopy()

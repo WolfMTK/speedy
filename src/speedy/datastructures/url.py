@@ -1,4 +1,3 @@
-import sys
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import NamedTuple, Any, Sequence
@@ -7,11 +6,6 @@ from urllib.parse import SplitResult, urlsplit, urlunsplit, urlencode
 from speedy._parsers import parse_query_string
 from speedy.datastructures.multi_dicts import MultiDict, ImmutableMultiDict
 from speedy.types.asgi_types import Scope
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
 
 
 class Address(NamedTuple):
@@ -46,7 +40,7 @@ class URL:
 
     url_components: URLComponents
 
-    def __new__(cls, url: 'str | SplitResult | URLPath') -> Self:
+    def __new__(cls, url: 'str | SplitResult | URLPath') -> "URL":
         """ Create a new instance. """
         return cls._new(url)
 
@@ -63,7 +57,7 @@ class URL:
         return f'{type(self).__name__}({url!r})'
 
     @classmethod
-    def from_scope(cls, scope: Scope) -> Self:
+    def from_scope(cls, scope: Scope) -> "URL":
         """ Construct a URL from a scope. """
         scheme = scope.get('scheme', 'http')
         server = scope.get('server', None)
@@ -94,7 +88,7 @@ class URL:
 
     @classmethod
     @lru_cache
-    def from_components(cls, components: URLComponents) -> Self:
+    def from_components(cls, components: URLComponents) -> "URL":
         """ Create a new URL from components. """
         return cls(
             SplitResult(
@@ -108,7 +102,7 @@ class URL:
 
     @classmethod
     @lru_cache
-    def _new(cls, url: 'str | SplitResult | URLPath') -> Self:
+    def _new(cls, url: 'str | SplitResult | URLPath') -> "URL":
         instance = super().__new__(cls)
         instance._parser_url = None
 
@@ -202,19 +196,19 @@ class URL:
             )
         return self._parser_url
 
-    def replace_query_params(self, **kwargs: Any) -> Self:
+    def replace_query_params(self, **kwargs: Any) -> "URL":
         """ Replace query parameters in the URL. """
         query = urlencode(tuple((str(key), str(value)) for key, value in kwargs.items()))
         return self._replace_query(query)
 
-    def include_query_params(self, **kwargs: Any) -> Self:
+    def include_query_params(self, **kwargs: Any) -> "URL":
         """ Include query parameters in the URL. """
         query_params = MultiDict(parse_query_string(query=self.query.encode()))
         query_params.update({str(key): str(value) for key, value in kwargs.items()})
         query = urlencode(list(query_params.multi_items()))
         return self._replace_query(query)
 
-    def remove_query_params(self, keys: str | Sequence[str]) -> Self:
+    def remove_query_params(self, keys: str | Sequence[str]) -> "URL":
         """ Remove query parameters in the URL. """
         if isinstance(keys, str):
             keys = [keys]
@@ -224,7 +218,7 @@ class URL:
         query = urlencode(list(query_params.multi_items()))
         return self._replace_query(query)
 
-    def replace(self, **kwargs: Any) -> Self:
+    def replace(self, **kwargs: Any) -> "URL":
         """ Replace components in the URL. """
         url_components = URLComponents(**kwargs)
         netloc = self._get_netloc(**kwargs)
@@ -272,7 +266,7 @@ class URL:
                 netloc = f'{userpass}@{netloc}'
         return netloc
 
-    def _replace_query(self, query: str) -> Self:
+    def _replace_query(self, query: str) -> "URL":
         components = self.components._replace(query=query)
         return type(self)._new(components.geturl())
 
