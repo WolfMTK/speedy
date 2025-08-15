@@ -9,7 +9,7 @@ from speedy.datastructures import ImmutableState, State
 @pytest.mark.parametrize('state_class', (ImmutableState, State))
 def test_state_immutable_mapping(state_class: type[ImmutableState]) -> None:
     state_dict = {'first': 1, 'second': 2, 'third': 3}
-    state = state_class(state_dict, deep_copy=True)
+    state = state_class(state_dict, copy_data=True)
     assert len(state) == 3
     assert 'first' in state
     assert state['first'] == 1
@@ -59,7 +59,7 @@ def test_state_attributes() -> None:
 def test_state_dict() -> None:
     state_dict = {"first": 1, "second": 2, "third": 3}
     state = State(state_dict)
-    assert state.dict() == state_dict
+    assert state.as_dict() == state_dict
 
 
 def test_state_copy() -> None:
@@ -70,15 +70,16 @@ def test_state_copy() -> None:
     assert copy.key
 
 
-def test_state_copy_deep_copy_false() -> None:
-    state = State({}, deep_copy=False)
-    assert state.copy()._deep_copy is False
+def test_state_copy_copy_data_false() -> None:
+    state = State({}, copy_data=False)
+    assert state.copy()._copy_data is False
 
 
-def test_unpicklable_deep_copy_false() -> None:
+def test_unpicklable_copy_data_false() -> None:
     # a module cannot be deep copied
     import typing
 
-    state = ImmutableState({"module": typing}, deep_copy=False)
+    state = ImmutableState({"module": typing}, copy_data=False)
     copy(state)
     ImmutableState.validate(state)
+
