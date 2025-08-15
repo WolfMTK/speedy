@@ -2,6 +2,7 @@ import functools
 import inspect
 import re
 from collections.abc import Callable
+from enum import Enum
 from typing import TypeVar, cast, Any
 
 from speedy.types import Scope
@@ -33,4 +34,10 @@ def get_endpoint_name(endpoint: Callable[..., Any]) -> str:
     """ Get endpoint name. """
     if inspect.iscoroutine(endpoint) or inspect.isclass(endpoint):
         return endpoint.__name__
-    return endpoint.__class__.__name__
+    cls = type(endpoint)
+    return cls.__name__
+
+
+def get_enum_string_value(value: Enum | str) -> str:
+    """ Return the string value of a string enum. """
+    return value.value if isinstance(value, Enum) else value
