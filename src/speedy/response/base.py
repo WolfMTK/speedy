@@ -1,17 +1,31 @@
-from collections.abc import Iterable, Mapping, Sequence
+import itertools
+import re
+from collections.abc import Iterable, Mapping
 from datetime import datetime
-from typing import TypeVar, Any, ClassVar, Generic
+from typing import TypeVar, Any, ClassVar, Generic, overload
 
 from speedy import BackgroundTask, BackgroundTasks, MediaType
-from speedy.datastructures import MutableHeaders, Cookie, Headers
+from speedy.connection.request import Request
+from speedy.datastructures import MutableHeaders, Cookie, ETag
 from speedy.exceptions.http_exceptions import ImproperlyConfiguredException
+from speedy.serialization.msgspec_hooks import encode_msgpack, default_serializer, encode_json
 from speedy.status_code import HTTP_200_OK, HTTP_204_NO_CONTENT, HTTP_304_NOT_MODIFIED
-from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable, SAMESITE
+from speedy.types import (
+    Scope,
+    ASGIReceiveCallable,
+    ASGISendCallable,
+    SAMESITE,
+    ResponseHeaders,
+    Empty,
+    Serializer,
+)
 from speedy.types.asgi_types import HTTPResponseStartEvent, HTTPResponseBodyEvent
+from speedy.types.composite_types import ResponseCookies, TypeEncodersMap
 from speedy.utils.helpers import get_enum_string_value
 
 T = TypeVar('T')
-ZERO_VALUE = 0
+
+MEDIA_TYPE_APPLICATION_JSON_PATTERN = re.compile(r"^application/(?:.+\+)?json")
 
 
 class ASGIResponse:
@@ -134,40 +148,55 @@ class ASGIResponse:
 
 
 class Response(Generic[T]):
+    """ Base Litestar HTTP response class, used as the basis for all other response classes. """
+
+    content: T
+    type_encoders: TypeEncodersMap | None = None
+
     def __init__(
             self,
             content: T | None = None,
             background: BackgroundTask | BackgroundTasks | None = None,
-            headers: Headers | Mapping[str, str] | None = None,
-            cookie: Sequence[Cookie] | Mapping[str, str] | None = None,
+            cookies: ResponseCookies | None = None,
+            encoding: str = 'utf-8',
+            headers: ResponseHeaders | None = None,
             media_type: MediaType | str | None = None,
             status_code: int | None = HTTP_200_OK,
-            encoding: str = 'utf-8'
+            type_encoders: TypeEncodersMap | None = None,
     ) -> None:
+        self.content = content
         self.background = background
-        self.headers: MutableHeaders = self._init_headers(headers)
-        self.media_type = media_type
-        self.status_code = status_code
-        self.encoding = encoding
-        self.cookies = self._init_cookie(cookie)
-        self.body = self.render(content)
-
-    async def __call__(self, scope: Scope, recieve: ASGIReceiveCallable, send: ASGISendCallable) -> None:
-        prefix = 'websocket.' if scope['type'] == 'websocket' else ''
-        await send(
-            {
-                'type': prefix + 'http.response.start',
-                'status': self.status_code,
-                'headers': self.headers.raw,
-            }
+        self.cookies: list[Cookie] = (
+            [Cookie(key=key, value=value) for key, value in cookies.items()]
+            if isinstance(cookies, Mapping)
+            else list(cookies or [])
         )
-        await send({
-            'type': prefix + 'http.response.body',
-            'body': self.body,
-        })
+        self.encoding = encoding
+        self.headers: dict[str, Any] = (
+            dict(headers) if isinstance(headers, Mapping) else {h.name: h.value for h in headers or {}}
+        )
+        self.status_code = status_code
+        self.media_type = media_type
+        self.response_type_encoders = {**(self.type_encoders or {}), **(type_encoders or {})}
 
-        if self.background is not None:
-            await self.background()
+    @overload
+    def set_cookie(self, /, cookie: Cookie) -> None:
+        ...
+
+    @overload
+    def set_cookie(
+            self,
+            key: str,
+            value: str | None = None,
+            max_age: int | None = None,
+            expires: int | None = None,
+            path: str = "/",
+            domain: str | None = None,
+            secure: bool = False,
+            httponly: bool = False,
+            samesite: SAMESITE = "lax",
+    ) -> None:
+        ...
 
     def set_cookie(
             self,
@@ -208,61 +237,70 @@ class Response(Generic[T]):
         """ Delete a cookie. """
         cookie = Cookie(
             key=key,
-            max_age=ZERO_VALUE,
-            expires=ZERO_VALUE,
+            max_age=0,
+            expires=0,
             path=path,
-            domain=domain,
-            secure=secure,
-            httponly=httponly,
-            samesite=samesite
         )
         self.cookies = [val for val in self.cookies if val != cookie]
         self.cookies.append(cookie)
-
-    # TODO: add JSON processing
-    def render(self, content: Any) -> bytes:
-        """ Handle the rendering of content into a bytes string. """
-        if content is None:
-            return b''
-        if isinstance(content, bytes):
-            return content
-        return content.encode(self.encoding)
 
     def set_header(self, key: str, value: Any) -> None:
         """ Set a header on the response. """
         self.headers[key] = value
 
-    def _init_headers(self, headers: Headers | Mapping[str, str] | None) -> MutableHeaders:
-        raw_headers = {}
+    def set_etag(self, etag: str | ETag) -> None:
+        """ Set an etag header. """
+        self.headers["etag"] = etag.to_header() if isinstance(etag, ETag) else etag
 
-        if isinstance(headers, Headers):
-            raw_headers = {key: value for key, value in headers.items()}
-        elif isinstance(headers, Mapping):
-            raw_headers = dict(headers)
+    def render(self, content: Any, media_type: str, enc_hook: Serializer = default_serializer) -> bytes:
+        """ Handle the rendering of content into a bytes string. """
+        if isinstance(content, bytes):
+            return content
 
-        keys = [key.lower() for key in raw_headers.keys()]
-        is_content_length = 'content-length' in keys
-        is_content_type = 'content-type' in keys
+        if content is Empty:
+            raise RuntimeError("The `Empty` sentinel cannot be used as response content")
 
-        if self.body is not None and is_content_length and not (
-                self.status_code < HTTP_200_OK or self.status_code in (HTTP_204_NO_CONTENT, HTTP_304_NOT_MODIFIED)
-        ):
-            content_length = str(len(self.body))
-            raw_headers['Content-Length'] = content_length
+        try:
+            if media_type.startswith("text/") and not content:
+                return b""
 
-        content_type = self._get_content_type()
-        if content_type is not None and is_content_type:
-            if content_type.startswith('text/') and 'charset=' not in content_type.lower():
-                content_type += f'; charset={self.encoding}'
-            raw_headers['Content-Type'] = content_type
-        return MutableHeaders(raw_headers)
+            if isinstance(content, str):
+                return content.encode(self.encoding)
 
-    def _get_content_type(self) -> str | None:
-        if isinstance(self.media_type, MediaType):
-            return self.media_type.name
-        return self.media_type
+            if media_type == MediaType.MESSAGEPACK:
+                return encode_msgpack(content, enc_hook)
 
-    def _init_cookie(self, cookie: Sequence[Cookie] | Mapping[str, str]) -> list[Cookie]:
-        if isinstance(cookie, Mapping):
-            return [Cookie(key=key, value=value) for key, value in cookie.items()]
-        return list(cookie or [])
+            if MEDIA_TYPE_APPLICATION_JSON_PATTERN.match(
+                    media_type,
+            ):
+                return encode_json(content, enc_hook)
+
+            raise ImproperlyConfiguredException(f"unsupported media_type {media_type} for content {content!r}")
+        except (AttributeError, ValueError, TypeError) as e:
+            raise ImproperlyConfiguredException("Unable to serialize response content") from e
+
+    def to_asgi_response(
+            self,
+            request: Request,
+            *,
+            background: BackgroundTask | BackgroundTasks | None = None,
+            cookies: Iterable[Cookie] | None = None,
+            headers: dict[str, str] | None = None,
+            is_head_response: bool = False,
+            media_type: MediaType | str | None = None,
+            status_code: int | None = None,
+    ) -> ASGIResponse:
+        """ Create an ASGIResponse from a Response instance. """
+        headers = {**headers, **self.headers} if headers is not None else self.headers
+        cookies = self.cookies if cookies is None else itertools.chain(self.cookies, cookies)
+        media_type = get_enum_string_value(self.media_type or media_type or MediaType.JSON)
+        return ASGIResponse(
+            background=self.background or background,
+            body=self.render(self.content, media_type),
+            cookies=cookies,
+            encoding=self.encoding,
+            headers=headers,
+            is_head_response=is_head_response,
+            media_type=self.media_type or media_type,
+            status_code=self.status_code or status_code,
+        )
