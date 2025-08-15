@@ -1,7 +1,14 @@
+import re
+from abc import abstractmethod, ABC
 from collections.abc import Mapping, Iterator
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, ClassVar
 
+from speedy.exceptions.http_exceptions import ImproperlyConfiguredException
 from speedy.types import RawHeaders, ScopeHeaders
+
+ETAG_RE = re.compile(r'([Ww]/)?"(.+)"')
+PRINTABLE_ASCII_RE: re.Pattern[str] = re.compile(r"^[ -~]+$")
 
 
 class Headers(Mapping[str, str]):
@@ -170,3 +177,54 @@ class MutableHeaders(Headers):
         if existing is not None:
             vary = ', '.join([existing, vary])
         self['vary'] = vary
+
+
+@dataclass
+class Header(ABC):
+    """An abstract type for HTTP headers."""
+
+    HEADER_NAME: ClassVar[str] = ""
+
+    @abstractmethod
+    def _get_header_value(self) -> str:
+        """ Get the header value as string. """
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def from_header(cls, header_value: str) -> "Header":
+        """Construct a header from its string representation."""
+
+    def to_header(self, include_header_name: bool = False) -> str:
+        """ Get the header as string. """
+
+        if not self.HEADER_NAME:
+            raise ImproperlyConfiguredException("Missing header name")
+
+        return (f"{self.HEADER_NAME}: " if include_header_name else "") + self._get_header_value()
+
+
+@dataclass
+class ETag(Header):
+    """ An ``etag`` header. """
+
+    HEADER_NAME: ClassVar[str] = "etag"
+
+    weak: bool = False
+    value: str | None = field(default=None)
+
+    @classmethod
+    def from_header(cls, header_value: str) -> "ETag":
+        """ Construct an ``etag`` header from its string representation. """
+        match = ETAG_RE.match(header_value)
+        if not match:
+            raise ImproperlyConfiguredException
+        weak, value = match.group(1, 2)
+        try:
+            return cls(weak=bool(weak), value=value)
+        except ValueError as exc:
+            raise ImproperlyConfiguredException from exc
+
+    def _get_header_value(self) -> str:
+        value = f'"{self.value}"'
+        return f"W/{value}" if self.weak else value
