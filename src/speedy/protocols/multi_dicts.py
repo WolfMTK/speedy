@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from collections.abc import KeysView, ValuesView, ItemsView, Mapping, Iterator
 from typing import Any, TypeVar, Generic
@@ -45,7 +43,7 @@ class MultiMapping(Generic[_Key, _Value], ABC):
     @abstractmethod
     def update(
             self,
-            *args: Mapping[_Key, _Value] | MultiMapping[_Key, _Value] | list[tuple[Any, Any]],
+            *args: "Mapping[_Key, _Value] | MultiMapping[_Key, _Value] | list[tuple[Any, Any]]",
             **kwargs: Any
     ) -> None: ...
 
