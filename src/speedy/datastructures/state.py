@@ -132,5 +132,6 @@ class State(ImmutableState, MutableMapping[str, Any]):
             return csl(self._data, copy_data=False)
 
     def mutable_copy(self) -> "State":
+        """ Return a mutable copy of the state object. """
         with self._lock:
             return State(self._data, copy_data=False)
