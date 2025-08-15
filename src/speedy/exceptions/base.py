@@ -1,3 +1,7 @@
+class SpeedyException(Exception):
+    pass
+
+
 class ASGIApplicationException(Exception):
     pass
 
