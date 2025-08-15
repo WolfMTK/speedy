@@ -39,6 +39,7 @@ from typing import (
     Callable,
     Awaitable,
     TYPE_CHECKING,
+    TypeAlias,
 )
 
 from speedy.enums import HttpMethod, ScopeType
@@ -46,7 +47,7 @@ from speedy.enums import HttpMethod, ScopeType
 if sys.version_info >= (3, 11):
     from typing import NotRequired
 else:
-    from typing_extensions import NotRequired, TypeAlias
+    from typing_extensions import NotRequired
 
 if TYPE_CHECKING:
     from speedy.protocols import ASGIApplication
