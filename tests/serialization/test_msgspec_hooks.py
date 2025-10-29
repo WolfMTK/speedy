@@ -61,3 +61,11 @@ def test_default_serializer_with_custom_type_encoder() -> None:
     except AssertionError:
         # Windows
         assert encoder(Path("/foo")) == "custom:\\foo"
+
+
+def test_default_serializer_unsupported_type_encoders() -> None:
+    class UnsupportedTypeEncoder:
+        pass
+
+    with pytest.raises(TypeError, match="Unsupported type"):
+        default_serializer(UnsupportedTypeEncoder())
