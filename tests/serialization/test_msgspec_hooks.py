@@ -49,3 +49,15 @@ def test_default_serializer(cases: tuple[Any, str]) -> None:
     result = encoder(value)
     expected_result = expected_encoder(value)  # noqa
     assert result == expected_result
+
+
+def test_default_serializer_with_custom_type_encoder() -> None:
+    custom_encoder = {
+        Path: lambda v: f"custom:{v}",
+    }
+    encoder = default_serializer(Path("foo"), type_encoders=custom_encoder)
+    try:
+        assert encoder(Path("/foo")) == "custom:/foo"
+    except AssertionError:
+        # Windows
+        assert encoder(Path("/foo")) == "custom:\\foo"
