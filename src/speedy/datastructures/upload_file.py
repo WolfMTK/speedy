@@ -2,7 +2,6 @@ from tempfile import SpooledTemporaryFile
 
 from speedy.concurrency import sync_to_thread
 from speedy.constants import ONE_MEGABYTE
-from speedy.datastructures.headers import Headers
 
 TIME = 0
 SIZE_FILE = -1
@@ -15,15 +14,10 @@ class UploadFile:
             *,
             file_data: bytes | None = None,
             size: int = ONE_MEGABYTE,
-            headers: dict[str, str] | Headers | None = None
+            headers: dict[str, str] | None = None,
     ) -> None:
         self.filename = filename
-
-        if isinstance(headers, dict):
-            self.headers = Headers(headers)
-        else:
-            self.headers = headers or Headers()
-
+        self.headers = headers or {}
         self.file = SpooledTemporaryFile(max_size=size)
         if file_data:
             self._write_file(file_data)
