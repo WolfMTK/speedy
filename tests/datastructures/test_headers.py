@@ -1,6 +1,8 @@
 import pytest
 
-from speedy.datastructures import Headers, MutableHeaders
+from speedy import MediaType
+from speedy.datastructures import Headers, MutableHeaders, Accept
+
 
 
 def test_headers() -> None:
@@ -80,8 +82,10 @@ def test_mutable_headers() -> None:
 
 
 @pytest.mark.parametrize(
-    'value', (MutableHeaders({'a': '1'}),
-              {'a': '1'})
+    'value', (
+            MutableHeaders({'a': '1'}),
+            {'a': '1'},
+    ),
 )
 def test_mutable_headers_merge(value: MutableHeaders | dict[str, str]) -> None:
     headers = MutableHeaders()
@@ -93,8 +97,10 @@ def test_mutable_headers_merge(value: MutableHeaders | dict[str, str]) -> None:
 
 
 @pytest.mark.parametrize(
-    'value', (MutableHeaders({'a': '1'}),
-              {'a': '1'})
+    'value', (
+            MutableHeaders({'a': '1'}),
+            {'a': '1'},
+    ),
 )
 def test_mutable_headers_update(value: MutableHeaders | dict[str, str]) -> None:
     headers = MutableHeaders()
@@ -120,3 +126,30 @@ def test_mutable_headers_from_scope() -> None:
     assert dict(headers) == {'a': '1', 'b': '2'}
     assert list(headers.items()) == [('a', '1'), ('b', '2',)]
     assert list(headers.raw) == [(b'a', b'1'), (b'b', b'2')]
+
+@pytest.mark.parametrize(
+    "accept_value, provided_types,best_match",
+    (
+        ("text/plain", ["text/plain"], "text/plain"),
+        ("text/plain", [MediaType.TEXT], MediaType.TEXT),
+        ("text/plain", ["text/plain"], "text/plain"),
+        ("text/plain", ["text/html"], None),
+        ("text/*", ["text/html"], "text/html"),
+        ("*/*", ["text/html"], "text/html"),
+        ("text/plain;p=test", ["text/plain"], "text/plain"),
+        ("text/plain", ["text/plain;p=test"], None),
+        ("text/plain;p=test", ["text/plain;p=test"], "text/plain;p=test"),
+        ("text/plain", ["text/*"], "text/plain"),
+        ("text/html", ["*/*"], "text/html"),
+        ("text/plain;q=0.8,text/html", ["text/plain", "text/html"], "text/html"),
+        ("text/*,text/html", ["text/plain", "text/html"], "text/html"),
+    ),
+)
+def test_accept_best_match(accept_value: str, provided_types: list[str], best_match: str | None) -> None:
+    accept = Accept(accept_value)
+    assert accept.best_match(provided_types) == best_match
+
+
+def test_accept_accepts() -> None:
+    accept = Accept("text/plain;q=0.8,text/html")
+    assert accept.accepts(MediaType.TEXT)
