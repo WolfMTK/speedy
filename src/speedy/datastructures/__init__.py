@@ -1,5 +1,5 @@
 from .cookie import Cookie
-from .headers import Headers, MutableHeaders, ETag, Header
+from .headers import Headers, MutableHeaders, ETag, Header, Accept
 from .multi_dicts import ImmutableMultiDict, MultiDict, FormMultiDict
 from .response_header import ResponseHeader
 from .secrets_values import SecretBytes, SecretString
@@ -26,4 +26,5 @@ __all__ = (
     "SecretBytes",
     "SecretString",
     "ResponseHeader",
+    "Accept",
 )
