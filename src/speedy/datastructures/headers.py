@@ -287,15 +287,24 @@ class MediaTypeHeader:
 
     def match(self, other: "MediaTypeHeader") -> bool:
         """ Checks if this `MediaTypeHeader` matches another based on HTTP `Accept` header rules. """
-        if not (self.maintype == "*" or other.maintype == "*" or self.maintype == other.maintype):
-            return False
-
-        if not (self.subtype == "*" or other.subtype == "*" or self.subtype == other.subtype):
-            return False
-        return all(
+        params_match = all(
             other.params.get(key) == value
             for key, value in self.params.items()
-            if key != "q",
+            if key != "q"
+        )
+        if not params_match:
+            return False
+        types_match = (
+                self.maintype == "*" or
+                other.maintype == "*" or
+                self.maintype == other.maintype
+        )
+        if not types_match:
+            return False
+        return (
+                self.subtype == "*" or
+                other.subtype == "*" or
+                self.subtype == other.subtype
         )
 
 
