@@ -5,7 +5,7 @@ from email.utils import decode_rfc2231
 from typing import Any
 from urllib.parse import unquote
 
-from speedy.datastructures import UploadFile
+from speedy.datastructures.upload_file import UploadFile
 from speedy.exceptions import ValidationException
 
 _firefox_quote_escape = re.compile(r'\\"(?!; |\s*$)')
@@ -33,7 +33,7 @@ class _Parser:
 
         if len(form_parts) > self.multipart_limit:
             raise ValidationException(
-                f'number of form parts exceeds allowed limit of {self.multipart_limit}'
+                f'number of form parts exceeds allowed limit of {self.multipart_limit}',
             )
         return form_parts
 
@@ -53,7 +53,7 @@ class MultiPartFormParser(_Parser):
             self,
             body: bytes,
             boundary: bytes,
-            multipart_limit: int = 1000
+            multipart_limit: int = 1000,
     ) -> None:
         self.body = body
         self.boundary = boundary
@@ -92,13 +92,15 @@ class MultiPartFormParser(_Parser):
             form_part: _FormPart,
             fields: defaultdict[str, list[Any]],
             form: bytes,
-            line_index: int
+            line_index: int,
     ) -> None:
         post_data = form[line_index:].rstrip(b'\r\n--').lstrip(b'\r\n')
         if form_part.file_name:
-            form_file = UploadFile(filename=form_part.file_name,
-                                   file_data=post_data,
-                                   headers=dict(form_part.headers))
+            form_file = UploadFile(
+                filename=form_part.file_name,
+                file_data=post_data,
+                headers=dict(form_part.headers),
+            )
             fields[form_part.field_name].append(form_file)
         elif post_data:
             fields[form_part.field_name].append(post_data.decode(form_part.charset))
@@ -108,7 +110,7 @@ class MultiPartFormParser(_Parser):
     def _encode_content_disposition(
             self,
             form_part: _FormPart,
-            form_parameters: dict[str, str]
+            form_parameters: dict[str, str],
     ) -> None:
         form_part.field_name = form_parameters.get("name")
         form_part.file_name = form_parameters.get("filename")
