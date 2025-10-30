@@ -4,6 +4,7 @@ from collections.abc import Mapping, Iterator
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
+from speedy._multipart import parse_content_header
 from speedy.exceptions.http_exceptions import ImproperlyConfiguredException
 from speedy.types import RawHeaders, ScopeHeaders
 
@@ -16,7 +17,7 @@ class Headers(Mapping[str, str]):
             self,
             headers: Mapping[str, str] | None = None,
             raw: RawHeaders | None = None,
-            scope: ScopeHeaders | None = None
+            scope: ScopeHeaders | None = None,
     ) -> None:
         self._raw: RawHeaders = self._get_raw(headers, raw, scope)
 
@@ -67,21 +68,25 @@ class Headers(Mapping[str, str]):
 
     def items(self) -> list[tuple[str, str]]:
         """ Get items. """
-        return [(key.decode('latin-1'),
-                 value.decode('latin-1')) for key, value in self._raw]
+        return [(
+            key.decode('latin-1'),
+            value.decode('latin-1'),
+        ) for key, value in self._raw]
 
     def getlist(self, key: str) -> list[str]:
         """ Get list values. """
         header_key = key.lower().encode('latin-1')
-        return [value.decode('latin-1') for key, value in self._raw if header_key == key]
+        return [value.decode('latin-1') for key, value in self._raw if
+                header_key == key]
 
     def mutablecopy(self) -> "MutableHeaders":
         return MutableHeaders(raw=self.raw)
 
     def _get_raw(self,
-                 headers: Mapping[str, str] | None = None,
-                 raw: RawHeaders | None = None,
-                 scope: ScopeHeaders | None = None) -> RawHeaders:
+            headers: Mapping[str, str] | None = None,
+            raw: RawHeaders | None = None,
+            scope: ScopeHeaders | None = None,
+    ) -> RawHeaders:
         if headers is not None:
             if raw is not None:
                 raise AttributeError('Cannot set both "headers" and "raw".')
@@ -89,8 +94,10 @@ class Headers(Mapping[str, str]):
             if scope is not None:
                 raise AttributeError('Cannot set both "headers" and "scope".')
 
-            return [(key.lower().encode('latin-1'),
-                     value.encode('latin-1')) for key, value in headers.items()]
+            return [(
+                key.lower().encode('latin-1'),
+                value.encode('latin-1'),
+            ) for key, value in headers.items()]
         elif raw is not None:
             if scope is not None:
                 raise AttributeError('Cannot set both "raw" and "scope".')
@@ -135,13 +142,17 @@ class MutableHeaders(Headers):
 
     def __ior__(self, other: Mapping[str, str]) -> "MutableHeaders":
         if not isinstance(other, Mapping):
-            raise TypeError(f'Expected a mapping but got {type(other).__name__}')
+            raise TypeError(
+                f'Expected a mapping but got {type(other).__name__}',
+            )
         self.update(other)
         return self
 
     def __or__(self, other: Mapping[str, str]) -> "MutableHeaders":
         if not isinstance(other, Mapping):
-            raise TypeError(f'Expected a mapping but got {type(other).__name__}')
+            raise TypeError(
+                f'Expected a mapping but got {type(other).__name__}',
+            )
         mutable_headers = self.mutablecopy()
         mutable_headers.update(other)
         return mutable_headers
@@ -158,7 +169,9 @@ class MutableHeaders(Headers):
 
     def append(self, key: str, value: str) -> None:
         """ Append a header, preserving any duplicate entries. """
-        self._raw.append((key.lower().encode('latin-1'), value.encode('latin-1')))
+        self._raw.append(
+            (key.lower().encode('latin-1'), value.encode('latin-1')),
+        )
 
     def setdefault(self, key: str, value: str) -> str:
         """ Set default key and value in RawHeaders. """
@@ -210,7 +223,7 @@ class ETag(Header):
 
     HEADER_NAME: ClassVar[str] = "etag"
 
-    weak: bool = False
+    weak: bool = field(default=False)
     value: str | None = field(default=None)
 
     @classmethod
@@ -226,5 +239,100 @@ class ETag(Header):
             raise ImproperlyConfiguredException from exc
 
     def _get_header_value(self) -> str:
-        value = f'"{self.value}"'
+        value = f"\"{self.value}\""
         return f"W/{value}" if self.weak else value
+
+
+class MediaTypeHeader:
+    """ A helper class for `Accept` header parsing. """
+
+    def __init__(self, type_str: str) -> None:
+        self._params_str = "".join(type_str.partition(";")[1:])
+
+        full_type, self.params = parse_content_header(type_str)
+        self.maintype, _, self.subtype = full_type.partition("/")
+
+    def __str__(self) -> str:
+        return f"{self.maintype}/{self.subtype}{self._params_str}"
+
+    def copy(self) -> "MediaTypeHeader":
+        """ Creates a shallow copy of the `MediaTypeHeader` instance. """
+        new_obj = self.__class__.__new__(self.__class__)
+        new_obj._params_str = self._params_str
+        new_obj.params = self.params
+        new_obj.maintype = self.maintype
+        new_obj.subtype = self.subtype
+        return new_obj
+
+    @property
+    def priority(self) -> tuple[int, int]:
+        """ Calculates and returns the priority tuple for this media type. """
+        quality = 100
+        q_value_str = self.params.get("q")
+        if q_value_str is not None:
+            try:
+                quality = int(100 * max(0.0, min(1.0, float(q_value_str))))
+            except (ValueError, TypeError):
+                pass
+
+        if self.maintype == "*":
+            specificity = 0
+        elif self.subtype == "*":
+            specificity = 1
+        elif sum(1 for k in self.params if k != "q") == 0:
+            specificity = 2
+        else:
+            specificity = 3
+        return quality, specificity
+
+    def match(self, other: "MediaTypeHeader") -> bool:
+        """ Checks if this `MediaTypeHeader` matches another based on HTTP `Accept` header rules. """
+        if not (self.maintype == "*" or other.maintype == "*" or self.maintype == other.maintype):
+            return False
+
+        if not (self.subtype == "*" or other.subtype == "*" or self.subtype == other.subtype):
+            return False
+        return all(
+            other.params.get(key) == value
+            for key, value in self.params.items()
+            if key != "q",
+        )
+
+
+class Accept:
+    """ An ``accept`` header. """
+
+    def __init__(self, value: str) -> None:
+        self._accepted_types = sorted(
+            (MediaTypeHeader(val) for val in value.split(",")),
+            key=lambda x: x.priority,
+            reverse=True,
+        )
+
+    def __len__(self) -> int:
+        return len(self._accepted_types)
+
+    def __getitem__(self, index: int) -> str:
+        return str(self._accepted_types[index])
+
+    def __iter__(self) -> Iterator[str]:
+        return map(str, self._accepted_types)
+
+    def best_match(self, provided_types: list[str], default: str | None = None) -> str | None:
+        """ Find the best matching media type for the request. """
+        types = set(MediaTypeHeader(val) for val in provided_types)
+
+        for accepted in self._accepted_types:
+            for provided in types:
+                if provided.match(accepted):
+                    result = provided.copy()
+                    if result.subtype == "*":
+                        result.subtype = accepted.subtype
+                    if result.maintype == "*":
+                        result.maintype = accepted.maintype
+                    return str(result)
+        return default
+
+    def accepts(self, media_type: str) -> bool:
+        """ Check if the request accepts the specified media type. """
+        return self.best_match([media_type]) == media_type
