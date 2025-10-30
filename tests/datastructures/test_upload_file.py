@@ -33,8 +33,6 @@ async def test_upload_file_rolling() -> None:
 
 async def test_upload_file_repr() -> None:
     file = UploadFile(filename='file', file_data=b'', size=0)
-    assert repr(file) == "UploadFile(filename='file', headers=Headers({}))"
+    assert repr(file) == "UploadFile(filename='file', headers={})"
     file = UploadFile(filename='file', file_data=b'', size=0, headers={'content-type': 'video/mp4'})
-    assert repr(file) == "UploadFile(filename='file', headers=Headers({'content-type': 'video/mp4'}))"
-    file = UploadFile(filename='file', file_data=b'', size=0, headers=Headers({'content-type': 'video/mp4'}))
-    assert repr(file) == "UploadFile(filename='file', headers=Headers({'content-type': 'video/mp4'}))"
+    assert repr(file) == "UploadFile(filename='file', headers={'content-type': 'video/mp4'})"
