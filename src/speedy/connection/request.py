@@ -6,69 +6,85 @@ from speedy import RequestEncodingType
 from speedy._multipart import parse_content_header, MultiPartFormParser
 from speedy._parsers import parse_url_encoded_form_data
 from speedy.connection.base import ASGIConnection, empty_receive, empty_send
-from speedy.datastructures import FormMultiDict
+from speedy.datastructures import FormMultiDict, Accept
 from speedy.exceptions import RequestException, InternalServerException
 from speedy.protocols.connection import UserT, AuthT, StateT
 from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable, Method
 
 SERVER_PUSH_HEADERS = {
-    'accept',
-    'accept-encoding',
-    'accept-language',
-    'cache-control',
-    'user-agent',
+    "accept",
+    "accept-encoding",
+    "accept-language",
+    "cache-control",
+    "user-agent",
 }
 
 
-class Request(Generic[UserT, AuthT, StateT], ASGIConnection[UserT, AuthT, StateT]):
+class Request(
+    Generic[UserT, AuthT, StateT],
+    ASGIConnection["HTTPRouteHandler", UserT, AuthT, StateT],
+):
     """ The application Request class. """
 
     def __init__(
             self,
             scope: Scope,
             receive: ASGIReceiveCallable = empty_receive,
-            send: ASGISendCallable = empty_send
+            send: ASGISendCallable = empty_send,
     ) -> None:
-        if scope['type'] != 'http':
-            raise RequestException('Invalid scope type. The type `http` was expected.')
+        if scope["type"] != "http":
+            raise RequestException(
+                "Invalid scope type. The type `http` was expected.",
+            )
         super().__init__(scope, receive, send)
         self._body: bytes | None = None
         self._is_connected: bool = True
         self._json: Any = None
         self._form: FormMultiDict | None = None
         self._content_type: tuple[str, dict[str, str]] | None = None
+        self._accept: Accept | None = None
 
     @property
     def method(self) -> Method:
         """ Return the request method. """
-        return self.scope['method']
+        return self.scope["method"]
 
     @property
-    def content_type(self) -> tuple[str, dict[str, str],]:
+    def content_type(self) -> tuple[str, dict[str, str]]:
         """ Return the request content type. """
         if self._content_type is None:
-            self._content_type = parse_content_header(self.headers.get('Content-Type', ''))
+            self._content_type = parse_content_header(
+                self.headers.get("Content-Type", ""),
+            )
         return self._content_type
+
+    @property
+    def accept(self) -> Accept:
+        if self._accept is None:
+            self._accept = Accept(self.headers.get("Accept", "*/*"))
+        return self._accept
 
     async def stream(self) -> AsyncGenerator[bytes, None]:
         """ Return an async generator that streams chunks of bytes. """
         if self._body is not None:
             yield self._body
-            yield b''
+            yield b""
             return
 
         if not self._is_connected:
-            raise InternalServerException('stream consumed')
+            raise InternalServerException("stream consumed")
 
         while message := await self.receive():
-            if message['type'] == 'http.request':
-                body = message.get('body', b'')
-                if not message.get('more_body', False):
+            if message["type"] == "http.request":
+                body = message.get("body", b"")
+                if not message.get("more_body", False):
                     break
                 if body:
                     yield body
-            elif message['type'] == 'http.disconnect':
-                raise InternalServerException('client disconnected prematurely')
+            elif message["type"] == "http.disconnect":
+                raise InternalServerException(
+                    "client disconnected prematurely",
+                )
         self._is_connected = False
         yield b''
 
@@ -92,12 +108,12 @@ class Request(Generic[UserT, AuthT, StateT], ASGIConnection[UserT, AuthT, StateT
             if content_type == RequestEncodingType.MULTI_PART:
                 form_data = MultiPartFormParser(
                     body=await self.body(),
-                    boundary=options.get('boundary', '').encode(),
-                    multipart_limit=multipart_limit
+                    boundary=options.get("boundary", "").encode(),
+                    multipart_limit=multipart_limit,
                 ).parser()
             elif content_type == RequestEncodingType.URL_ENCODED:
                 form_data = parse_url_encoded_form_data(
-                    await self.body()
+                    await self.body(),
                 )
             else:
                 form_data = {}
@@ -112,18 +128,22 @@ class Request(Generic[UserT, AuthT, StateT], ASGIConnection[UserT, AuthT, StateT
 
         return self._form
 
+    async def close(self) -> None:
+        if self._form is not None:
+            await self._form.close()
+
     async def send_push_promise(self, path: str) -> None:
         """ Send a push promise. """
-        if 'http.response.push' in self.scope.get('extensions', {}):
+        if "http.response.push" in self.scope.get("extensions", {}):
             raw_headers = [
-                (header_name.encode('latin-1'), value.encode('latin-1'))
+                (header_name.encode("latin-1"), value.encode("latin-1"))
                 for header_name in SERVER_PUSH_HEADERS
                 for value in self.headers.getlist(header_name)
             ]
             await self.send(
                 {
-                    'type': 'http.response.push',
-                    'path': path,
-                    'headers': raw_headers
-                }
+                    "type": "http.response.push",
+                    "path": path,
+                    "headers": raw_headers,
+                },
             )
