@@ -2,13 +2,13 @@ import re
 from abc import abstractmethod, ABC
 from collections.abc import Mapping, Iterator
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TYPE_CHECKING
 
 from speedy._multipart import parse_content_header
 from speedy.exceptions.http_exceptions import ImproperlyConfiguredException
-from speedy.types import RawHeaders, ScopeHeaders
+from speedy.types import RawHeaders, ScopeHeaders, Scope
 
-ETAG_RE = re.compile(r'([Ww]/)?"(.+)"')
+ETAG_RE = re.compile(r"([Ww]/)?\"(.+)\"")
 PRINTABLE_ASCII_RE: re.Pattern[str] = re.compile(r"^[ -~]+$")
 
 
@@ -17,19 +17,19 @@ class Headers(Mapping[str, str]):
             self,
             headers: Mapping[str, str] | None = None,
             raw: RawHeaders | None = None,
-            scope: ScopeHeaders | None = None,
+            scope: Scope | None = None,
     ) -> None:
         self._raw: RawHeaders = self._get_raw(headers, raw, scope)
 
     def __getitem__(self, item: str) -> str:
-        header_key = item.lower().encode('latin-1')
+        header_key = item.lower().encode("latin-1")
         for key, value in self._raw:
             if header_key == key:
-                return value.decode('latin-1')
+                return value.decode("latin-1")
         raise KeyError(item)
 
     def __contains__(self, item: Any) -> bool:
-        header_key = item.lower().encode('latin-1')
+        header_key = item.lower().encode("latin-1")
         for key, _ in self._raw:
             if header_key == key:
                 return True
@@ -50,33 +50,39 @@ class Headers(Mapping[str, str]):
         name = type(self).__name__
         as_dict = dict(self.items())
         if len(as_dict) == len(self):
-            return f'{name}({as_dict!r})'
-        return f'{name}(raw={self.raw!r})'
+            return f"{name}({as_dict!r})"
+        return f"{name}(raw={self.raw!r})"
 
     @property
     def raw(self) -> RawHeaders:
         """ Get RawHeaders. """
         return self._raw.copy()
 
+    @classmethod
+    def from_scope(cls, scope: Scope) -> "Headers":
+        """ Create headers from a send-message. """
+        headers = cls(scope=scope)
+        return headers
+
     def keys(self) -> list[str]:
         """ Get keys. """
-        return [key.decode('latin-1') for key, _ in self._raw]
+        return [key.decode("latin-1") for key, _ in self._raw]
 
     def values(self) -> list[str]:
         """ Get values. """
-        return [value.decode('latin-1') for key, value in self._raw]
+        return [value.decode("latin-1") for key, value in self._raw]
 
     def items(self) -> list[tuple[str, str]]:
         """ Get items. """
         return [(
-            key.decode('latin-1'),
-            value.decode('latin-1'),
+            key.decode("latin-1"),
+            value.decode("latin-1"),
         ) for key, value in self._raw]
 
     def getlist(self, key: str) -> list[str]:
         """ Get list values. """
-        header_key = key.lower().encode('latin-1')
-        return [value.decode('latin-1') for key, value in self._raw if
+        header_key = key.lower().encode("latin-1")
+        return [value.decode("latin-1") for key, value in self._raw if
                 header_key == key]
 
     def mutablecopy(self) -> "MutableHeaders":
@@ -85,32 +91,32 @@ class Headers(Mapping[str, str]):
     def _get_raw(self,
             headers: Mapping[str, str] | None = None,
             raw: RawHeaders | None = None,
-            scope: ScopeHeaders | None = None,
+            scope: Scope | None = None,
     ) -> RawHeaders:
         if headers is not None:
             if raw is not None:
-                raise AttributeError('Cannot set both "headers" and "raw".')
+                raise AttributeError("Cannot set both \"headers\" and \"raw\".")
 
             if scope is not None:
-                raise AttributeError('Cannot set both "headers" and "scope".')
+                raise AttributeError("Cannot set both \"headers\" and \"scope\".")
 
             return [(
-                key.lower().encode('latin-1'),
-                value.encode('latin-1'),
+                key.lower().encode("latin-1"),
+                value.encode("latin-1"),
             ) for key, value in headers.items()]
         elif raw is not None:
             if scope is not None:
-                raise AttributeError('Cannot set both "raw" and "scope".')
+                raise AttributeError("Cannot set both \"raw\" and \"scope\".")
             return raw
         elif scope is not None:
-            return list(scope['headers'])
+            return list(scope["headers"])
         return []
 
 
 class MutableHeaders(Headers):
     def __setitem__(self, key: str, value: str) -> None:
-        key = key.lower().encode('latin-1')
-        value = value.encode('latin-1')
+        key = key.lower().encode("latin-1")
+        value = value.encode("latin-1")
 
         updated_index = None
         removed_indexes = []
@@ -130,7 +136,7 @@ class MutableHeaders(Headers):
             del self._raw[index]
 
     def __delitem__(self, key: str) -> None:
-        key = key.lower().encode('latin-1')
+        key = key.lower().encode("latin-1")
 
         indexes = []
         for index, (_key, _) in enumerate(self._raw):
@@ -143,7 +149,7 @@ class MutableHeaders(Headers):
     def __ior__(self, other: Mapping[str, str]) -> "MutableHeaders":
         if not isinstance(other, Mapping):
             raise TypeError(
-                f'Expected a mapping but got {type(other).__name__}',
+                f"Expected a mapping but got {type(other).__name__}",
             )
         self.update(other)
         return self
@@ -151,7 +157,7 @@ class MutableHeaders(Headers):
     def __or__(self, other: Mapping[str, str]) -> "MutableHeaders":
         if not isinstance(other, Mapping):
             raise TypeError(
-                f'Expected a mapping but got {type(other).__name__}',
+                f"Expected a mapping but got {type(other).__name__}",
             )
         mutable_headers = self.mutablecopy()
         mutable_headers.update(other)
@@ -170,26 +176,26 @@ class MutableHeaders(Headers):
     def append(self, key: str, value: str) -> None:
         """ Append a header, preserving any duplicate entries. """
         self._raw.append(
-            (key.lower().encode('latin-1'), value.encode('latin-1')),
+            (key.lower().encode("latin-1"), value.encode("latin-1")),
         )
 
     def setdefault(self, key: str, value: str) -> str:
         """ Set default key and value in RawHeaders. """
-        key_header = key.lower().encode('latin-1')
-        value_header = value.encode('latin-1')
+        key_header = key.lower().encode("latin-1")
+        value_header = value.encode("latin-1")
 
         for index, (_key, _value) in enumerate(self._raw):
             if key_header == _key:
-                return _value.decode('latin')
+                return _value.decode("latin-1")
         self._raw.append((key_header, value_header))
         return value
 
     def add_vary_header(self, vary: str) -> None:
         """ Extend a multivalued header. """
-        existing = self.get('vary')
+        existing = self.get("vary")
         if existing is not None:
-            vary = ', '.join([existing, vary])
-        self['vary'] = vary
+            vary = ", ".join([existing, vary])
+        self["vary"] = vary
 
 
 @dataclass
