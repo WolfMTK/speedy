@@ -1,11 +1,11 @@
-from typing import Generic, NoReturn, Any
+from typing import Generic, NoReturn, Any, cast
 
 from speedy._parsers import parse_cookie_string
 from speedy.datastructures import URL, Headers, QueryParams, Address, State
 from speedy.exceptions import SessionException, AuthException
 from speedy.protocols.app import ASGIApplication
-from speedy.protocols.connection import UserT, AuthT, StateT
-from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable, Message
+from speedy.protocols.connection import UserT, AuthT, StateT, HandlerT
+from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable, ASGIReceiveEvent
 
 
 async def empty_receive() -> NoReturn:
@@ -13,12 +13,12 @@ async def empty_receive() -> NoReturn:
     raise RuntimeError()
 
 
-async def empty_send(_: Message) -> NoReturn:
+async def empty_send(_: ASGIReceiveEvent) -> NoReturn:
     """ Serves as a placeholder send function. """
     raise RuntimeError()
 
 
-class ASGIConnection(Generic[UserT, AuthT, StateT]):
+class ASGIConnection(Generic[HandlerT, UserT, AuthT, StateT]):
     """ The base ASGI connection class. """
 
     def __init__(
@@ -27,9 +27,9 @@ class ASGIConnection(Generic[UserT, AuthT, StateT]):
             receive: ASGIReceiveCallable = empty_receive,
             send: ASGISendCallable = empty_send,
     ) -> None:
-        self.scope = scope
-        self.receive = receive
-        self.send = send
+        self._scope = scope
+        self._receive = receive
+        self._send = send
         self._url: URL | None = None
         self._base_url: URL | None = None
         self._query_params: QueryParams | None = None
@@ -38,9 +38,25 @@ class ASGIConnection(Generic[UserT, AuthT, StateT]):
         self._headers: Headers | None = None
 
     @property
+    def scope(self) -> Scope:
+        return self._scope
+
+    @property
+    def receive(self) -> ASGIReceiveCallable:
+        return self._receive
+
+    @property
+    def send(self) -> ASGISendCallable:
+        return self._send
+
+    @property
     def app(self) -> ASGIApplication:
         """ Return the ASGI application. """
-        return self.scope['app']
+        return self.scope["app"]
+
+    @property
+    def route_handler(self) -> HandlerT:
+        return cast(HandlerT, self.scope["route_handler"])
 
     @property
     def url(self) -> URL:
@@ -53,15 +69,15 @@ class ASGIConnection(Generic[UserT, AuthT, StateT]):
     def base_url(self) -> URL:
         """ Return the base URL. """
         if self._base_url is None:
-            scope = dict(self.scope)
-            root_path = scope.get('root_path', '')
-            app_root_path = scope.get('app_root_path', root_path)
+            scope = cast(Scope, dict(self.scope))
+            root_path = scope.get("root_path", "")
+            app_root_path = scope.get("app_root_path", root_path)
             path = app_root_path
-            if not path.endswith('/'):
-                path += '/'
-            scope['path'] = path
-            scope['query_string'] = b''
-            scope['root_path'] = app_root_path
+            if not path.endswith("/"):
+                path += "/"
+            scope["path"] = path
+            scope["query_string"] = b""
+            scope["root_path"] = app_root_path
             self._base_url = URL.from_scope(scope)
         return self._base_url
 
@@ -69,27 +85,27 @@ class ASGIConnection(Generic[UserT, AuthT, StateT]):
     def headers(self) -> Headers:
         """ Return the headers. """
         if self._headers is None:
-            self._headers = Headers(scope=self.scope)
+            self._headers = Headers.from_scope(scope=self.scope)
         return self._headers
 
     @property
     def query_params(self) -> QueryParams:
         """ Return the query params. """
         if self._query_params is None:
-            self._query_params = QueryParams(self.scope['query_string'])
+            self._query_params = QueryParams(self.scope["query_string"])
         return self._query_params
 
     @property
     def path_params(self) -> dict[str, Any,]:
         """ Return the path params. """
-        return self.scope['path_params']
+        return self.scope["path_params"]
 
     @property
     def cookies(self) -> dict[str, str]:
         """ Return the cookies. """
         if self._cookies is None:
             cookies = {}
-            cookie_header = self.headers.get('cookie')
+            cookie_header = self.headers.get("cookie")
             if cookie_header:
                 cookies = parse_cookie_string(cookie_header)
             self._cookies = cookies
@@ -98,24 +114,24 @@ class ASGIConnection(Generic[UserT, AuthT, StateT]):
     @property
     def client(self) -> Address | None:
         """ Return the client address. """
-        client = self.scope.get('client')
+        client = self.scope.get("client")
         return Address(*client) if client is not None else None
 
     @property
     def session(self) -> dict[str, Any]:
         """ Return the session for this connection of a session was previously set in the scope. """
-        if 'session' not in self.scope:
+        if "session" not in self.scope:
             # TODO: add a detailed error description
-            raise SessionException('`session` is not defined in scope')
-        return self.scope['session']
+            raise SessionException("`session` is not defined in scope")
+        return self.scope["session"]
 
     @property
     def auth(self) -> AuthT:
         """ Return the auth data if this connection's scope. """
-        if 'auth' not in self.scope:
+        if "auth" not in self.scope:
             # TODO: add a detailed error description
-            raise AuthException('`auth` is not defined in scope')
-        return self.scope['auth']
+            raise AuthException("`auth` is not defined in scope")
+        return self.scope["auth"]
 
     @property
     def user(self) -> UserT:
@@ -129,12 +145,20 @@ class ASGIConnection(Generic[UserT, AuthT, StateT]):
     def state(self) -> StateT:
         """ Return the state of this connection. '"""
         if self._state is None:
-            self.scope.setdefault('state', {})
-            self._state = State(self.scope['state'])
+            self.scope.setdefault("state", {})
+            self._state = State(self.scope["state"])
         return self._state
 
     def url_for(self, name: str, **path_params: Any) -> URL:
         """ Return the url for a given route handler name. """
-        app: ASGIApplication = self.scope['app']
+        app: ASGIApplication = self.scope["app"]
         url_path = app.route_reverse(name, **path_params)
         return URL(url_path)
+
+    def set_session(self, value: dict[str, Any] | None) -> None:
+        """ Set the session in the connection's `Scope`. """
+        self.scope["session"] = value
+
+    def clear_session(self) -> None:
+        """ Remove the session from the connection's `Scope """
+        self.scope["session"] = None
