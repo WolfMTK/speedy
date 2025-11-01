@@ -1,18 +1,36 @@
 from abc import abstractmethod
-from typing import Protocol, Any, TypeVar
+from typing import Protocol, TypeVar, Any
 
-from speedy.datastructures import URL, Headers, QueryParams, Address
+from speedy.datastructures import URL, Headers, State, QueryParams, Address
 from speedy.protocols.app import ASGIApplication
+from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable
 
-AuthT = TypeVar('AuthT')
-UserT = TypeVar('UserT')
-StateT = TypeVar('StateT')
+AuthT = TypeVar("AuthT")
+UserT = TypeVar("UserT")
+StateT = TypeVar("StateT", bound=State)
+HandlerT = TypeVar("HandlerT")
 
 
-class Connection(Protocol[UserT, AuthT, StateT]):
+class Connection(Protocol[HandlerT, UserT, AuthT, StateT]):
+    @property
+    @abstractmethod
+    def scope(self) -> Scope: ...
+
+    @property
+    @abstractmethod
+    def receive(self) -> ASGIReceiveCallable: ...
+
+    @property
+    @abstractmethod
+    def send(self) -> ASGISendCallable: ...
+
     @property
     @abstractmethod
     def app(self) -> ASGIApplication: ...
+
+    @property
+    @abstractmethod
+    def route_handler(self) -> HandlerT: ...
 
     @property
     @abstractmethod
@@ -32,7 +50,7 @@ class Connection(Protocol[UserT, AuthT, StateT]):
 
     @property
     @abstractmethod
-    def path_params(self) -> dict[str, Any]: ...
+    def path_params(self) -> dict[str, Any,]: ...
 
     @property
     @abstractmethod
@@ -60,3 +78,9 @@ class Connection(Protocol[UserT, AuthT, StateT]):
 
     @abstractmethod
     def url_for(self, name: str, **path_params: Any) -> URL: ...
+
+    @abstractmethod
+    def set_session(self, value: dict[str, Any] | None) -> None: ...
+
+    @abstractmethod
+    def clear_session(self) -> None: ...

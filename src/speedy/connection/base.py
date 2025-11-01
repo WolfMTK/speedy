@@ -96,7 +96,7 @@ class ASGIConnection(Generic[HandlerT, UserT, AuthT, StateT]):
         return self._query_params
 
     @property
-    def path_params(self) -> dict[str, Any,]:
+    def path_params(self) -> dict[str, Any]:
         """ Return the path params. """
         return self.scope["path_params"]
 
