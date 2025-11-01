@@ -3,8 +3,8 @@ from typing import TypeVar, ParamSpec, Awaitable, Callable
 from speedy.concurrency import sync_to_thread
 from speedy.utils.predicates import is_async_callable
 
-P = ParamSpec('P')
-T = TypeVar('T')
+P = ParamSpec("P")
+T = TypeVar("T")
 
 
 def ensure_async_callable(func: Callable[P, T]) -> Callable[P, Awaitable[T]]:

@@ -1,1 +1,1 @@
-CONNECTION_STATE = '_ls_connection_state'
+CONNECTION_STATE = "_ls_connection_state"
