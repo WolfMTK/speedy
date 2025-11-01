@@ -52,9 +52,9 @@ else:
 if TYPE_CHECKING:
     from speedy.protocols import ASGIApplication
 
-Method: TypeAlias = Union[Literal['GET', 'POST', 'DELETE', 'PATCH', 'PUT', 'HEAD', 'TRACE', 'OPTIONS'], HttpMethod]
+Method: TypeAlias = Union[Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD", "TRACE", "OPTIONS"], HttpMethod]
 
-Version = Literal['2.0'] | Literal['3.0']
+Version = Literal["2.0"] | Literal["3.0"]
 
 
 class ASGIVersions(TypedDict):
@@ -109,7 +109,7 @@ class LifespanScope(TypedDict):
 class HTTPRequestEvent(TypedDict):
     """ ASGI `http.request` event. """
 
-    type: Literal['http.request']
+    type: Literal["http.request"]
     body: bytes
     more_body: bool
 
@@ -117,19 +117,19 @@ class HTTPRequestEvent(TypedDict):
 class HTTPDisconnectEvent(TypedDict):
     """ ASGI `http.disconnect` event. """
 
-    type: Literal['http.disconnect']
+    type: Literal["http.disconnect"]
 
 
 class WebSocketConnectEvent(TypedDict):
     """ ASGI `websocket.connect` event. """
 
-    type: Literal['websocket.connect']
+    type: Literal["websocket.connect"]
 
 
 class _WebSocketReceiveEventBytes(TypedDict):
     """ ASGI `websocket.receive` event. """
 
-    type: Literal['websocket.receive']
+    type: Literal["websocket.receive"]
     bytes: bytes
     text: NotRequired[None]
 
@@ -137,7 +137,7 @@ class _WebSocketReceiveEventBytes(TypedDict):
 class _WebSocketReceiveEventText(TypedDict):
     """ ASGI `websocket.receive` event. """
 
-    type: Literal['websocket.receive']
+    type: Literal["websocket.receive"]
     bytes: NotRequired[None]
     text: str
 
@@ -145,26 +145,26 @@ class _WebSocketReceiveEventText(TypedDict):
 class WebSocketDisconnectEvent(TypedDict):
     """ ASGI `websocket.receive` event. """
 
-    type: Literal['websocket.disconnect']
+    type: Literal["websocket.disconnect"]
     code: int
 
 
 class LifespanStartupEvent(TypedDict):
     """ ASGI `lifespan.startup` event. """
 
-    type: Literal['lifespan.startup']
+    type: Literal["lifespan.startup"]
 
 
 class LifespanShutdownEvent(TypedDict):
     """ ASGI `lifespan.shutdown` event. """
 
-    type: Literal['lifespan.shutdown']
+    type: Literal["lifespan.shutdown"]
 
 
 class HTTPResponseStartEvent(TypedDict):
     """ ASGI `http.response.start` event. """
 
-    type: Literal['http.response.start']
+    type: Literal["http.response.start"]
     status: int
     headers: NotRequired[Iterable[tuple[bytes, bytes]]]
     trailers: NotRequired[bool]
@@ -173,7 +173,7 @@ class HTTPResponseStartEvent(TypedDict):
 class HTTPResponseBodyEvent(TypedDict):
     """ ASGI `http.response.body` event. """
 
-    type: Literal['http.response.body']
+    type: Literal["http.response.body"]
     body: bytes
     more_body: NotRequired[bool]
 
@@ -181,7 +181,7 @@ class HTTPResponseBodyEvent(TypedDict):
 class HTTPResponseTrailersEvent(TypedDict):
     """ ASGI `http.response.trailers` event. """
 
-    type: Literal['http.response.trailers']
+    type: Literal["http.response.trailers"]
     headers: Iterable[tuple[bytes, bytes]]
     more_trailers: bool
 
@@ -189,7 +189,7 @@ class HTTPResponseTrailersEvent(TypedDict):
 class HTTPServerPushEvent(TypedDict):
     """ ASGI `http.response.push` event. """
 
-    type: Literal['http.response.push']
+    type: Literal["http.response.push"]
     path: str
     headers: Iterable[tuple[bytes, bytes]]
 
@@ -197,19 +197,19 @@ class HTTPServerPushEvent(TypedDict):
 class WebSocketAcceptEvent(TypedDict):
     """ ASGI `websocket.accept` event. """
 
-    type: Literal['websocket.accept']
+    type: Literal["websocket.accept"]
     subprotocol: NotRequired[str | None]
     headers: NotRequired[Iterable[tuple[bytes, bytes]]]
 
 
 class _WebSocketSendEventBytes(TypedDict):
-    type: Literal['websocket.send']
+    type: Literal["websocket.send"]
     bytes: bytes
     text: NotRequired[None]
 
 
 class _WebSocketSendEventText(TypedDict):
-    type: Literal['websocket.send']
+    type: Literal["websocket.send"]
     bytes: NotRequired[None]
     text: str
 
@@ -217,7 +217,7 @@ class _WebSocketSendEventText(TypedDict):
 class WebSocketResponseStartEvent(TypedDict):
     """ ASGI `websocket.http.response.start` event. """
 
-    type: Literal['websocket.http.response.start']
+    type: Literal["websocket.http.response.start"]
     status: int
     headers: Iterable[tuple[bytes, bytes]]
 
@@ -225,7 +225,7 @@ class WebSocketResponseStartEvent(TypedDict):
 class WebSocketResponseBodyEvent(TypedDict):
     """ ASGI `websocket.http.response.body` event. """
 
-    type: Literal['websocket.http.response.body']
+    type: Literal["websocket.http.response.body"]
     body: bytes
     more_body: NotRequired[bool]
 
@@ -233,7 +233,7 @@ class WebSocketResponseBodyEvent(TypedDict):
 class WebSocketCloseEvent(TypedDict):
     """ ASGI `websocket.close` event. """
 
-    type: Literal['websocket.close']
+    type: Literal["websocket.close"]
     code: NotRequired[int]
     reason: NotRequired[str | None]
 
@@ -241,26 +241,26 @@ class WebSocketCloseEvent(TypedDict):
 class LifespanStartupCompleteEvent(TypedDict):
     """ ASGI `lifespan.startup.complete` event. """
 
-    type: Literal['lifespan.startup.complete']
+    type: Literal["lifespan.startup.complete"]
 
 
 class LifespanStartupFailedEvent(TypedDict):
     """ ASGI `lifespan.startup.failed` event. """
 
-    type: Literal['lifespan.startup.failed']
+    type: Literal["lifespan.startup.failed"]
     message: str
 
 
 class LifespanShutdownCompleteEvent(TypedDict):
     """ ASGI `lifespan.shutdown.complete` event. """
 
-    type: Literal['lifespan.shutdown.complete']
+    type: Literal["lifespan.shutdown.complete"]
 
 
 class LifespanShutdownFailedEvent(TypedDict):
     """ ASGI `lifespan.shutdown.failed` event. """
 
-    type: Literal['lifespan.shutdown.failed']
+    type: Literal["lifespan.shutdown.failed"]
     message: str
 
 

@@ -1,6 +1,6 @@
 import json
 from collections.abc import AsyncGenerator
-from typing import Generic, Any
+from typing import Generic, Any, cast
 
 from speedy import RequestEncodingType
 from speedy._multipart import parse_content_header, MultiPartFormParser
@@ -10,6 +10,7 @@ from speedy.datastructures import FormMultiDict, Accept
 from speedy.exceptions import RequestException, InternalServerException
 from speedy.protocols.connection import UserT, AuthT, StateT
 from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable, Method
+from speedy.types.asgi_types import HTTPServerPushEvent
 
 SERVER_PUSH_HEADERS = {
     "accept",
@@ -141,9 +142,11 @@ class Request(
                 for value in self.headers.getlist(header_name)
             ]
             await self.send(
-                {
-                    "type": "http.response.push",
-                    "path": path,
-                    "headers": raw_headers,
-                },
+                cast(
+                    HTTPServerPushEvent, {
+                        "type": "http.response.push",
+                        "path": path,
+                        "headers": raw_headers,
+                    },
+                ),
             )
