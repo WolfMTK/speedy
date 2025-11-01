@@ -1,8 +1,10 @@
+from typing import cast
+
 import pytest
 
 from speedy import MediaType
 from speedy.datastructures import Headers, MutableHeaders, Accept
-
+from speedy.types import Scope
 
 
 def test_headers() -> None:
@@ -59,11 +61,15 @@ def test_headers_mutablecopy() -> None:
 
 
 def test_headers_from_scope() -> None:
-    headers = Headers(scope={'headers': ((b'a', b'1'),)})
+    headers = Headers(scope=cast(Scope, {'headers': ((b'a', b'1'),)}))
     assert dict(headers) == {'a': '1'}
     assert list(headers.items()) == [('a', '1')]
     assert list(headers.raw) == [(b'a', b'1')]
 
+    headers = Headers.from_scope(scope=cast(Scope, {'headers': ((b'a', b'1'),)}))
+    assert dict(headers) == {'a': '1'}
+    assert list(headers.items()) == [('a', '1')]
+    assert list(headers.raw) == [(b'a', b'1')]
 
 def test_mutable_headers() -> None:
     headers = MutableHeaders()
@@ -127,22 +133,23 @@ def test_mutable_headers_from_scope() -> None:
     assert list(headers.items()) == [('a', '1'), ('b', '2',)]
     assert list(headers.raw) == [(b'a', b'1'), (b'b', b'2')]
 
+
 @pytest.mark.parametrize(
     "accept_value, provided_types,best_match",
     (
-        ("text/plain", ["text/plain"], "text/plain"),
-        ("text/plain", [MediaType.TEXT], MediaType.TEXT),
-        ("text/plain", ["text/plain"], "text/plain"),
-        ("text/plain", ["text/html"], None),
-        ("text/*", ["text/html"], "text/html"),
-        ("*/*", ["text/html"], "text/html"),
-        ("text/plain;p=test", ["text/plain"], "text/plain"),
-        ("text/plain", ["text/plain;p=test"], None),
-        ("text/plain;p=test", ["text/plain;p=test"], "text/plain;p=test"),
-        ("text/plain", ["text/*"], "text/plain"),
-        ("text/html", ["*/*"], "text/html"),
-        ("text/plain;q=0.8,text/html", ["text/plain", "text/html"], "text/html"),
-        ("text/*,text/html", ["text/plain", "text/html"], "text/html"),
+            ("text/plain", ["text/plain"], "text/plain"),
+            ("text/plain", [MediaType.TEXT], MediaType.TEXT),
+            ("text/plain", ["text/plain"], "text/plain"),
+            ("text/plain", ["text/html"], None),
+            ("text/*", ["text/html"], "text/html"),
+            ("*/*", ["text/html"], "text/html"),
+            ("text/plain;p=test", ["text/plain"], "text/plain"),
+            ("text/plain", ["text/plain;p=test"], None),
+            ("text/plain;p=test", ["text/plain;p=test"], "text/plain;p=test"),
+            ("text/plain", ["text/*"], "text/plain"),
+            ("text/html", ["*/*"], "text/html"),
+            ("text/plain;q=0.8,text/html", ["text/plain", "text/html"], "text/html"),
+            ("text/*,text/html", ["text/plain", "text/html"], "text/html"),
     ),
 )
 def test_accept_best_match(accept_value: str, provided_types: list[str], best_match: str | None) -> None:
