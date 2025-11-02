@@ -466,6 +466,9 @@ wheels = [
 name = "speedy"
 version = "0.0.1"
 source = { editable = "." }
+dependencies = [
+    { name = "typing-extensions" },
+]
 
 [package.optional-dependencies]
 dev = [
@@ -499,6 +502,7 @@ requires-dist = [
     { name = "pytest-mock", marker = "extra == 'dev'", specifier = "<=3.15.1" },
     { name = "time-machine", marker = "extra == 'dev'", specifier = "<=2.19.0" },
     { name = "tox", marker = "extra == 'dev'", specifier = ">=4.28.4" },
+    { name = "typing-extensions" },
     { name = "ujson", marker = "extra == 'dev'", specifier = "<=5.11.0" },
     { name = "ujson", marker = "extra == 'ujson'", specifier = "<=5.11.0" },
 ]
