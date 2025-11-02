@@ -14,7 +14,8 @@ import pytest
 
 from speedy.datastructures import SecretBytes, SecretString, ImmutableState
 from speedy.exceptions.base import SerializationException
-from speedy.serialization.msgspec_hooks import default_serializer, default_deserializer, encode_json, encode_msgpack
+from speedy.serialization import encode_json, encode_msgpack
+from speedy.serialization.base import default_serializer, default_deserializer
 
 DATETIME = datetime(2023, 10, 1, 12, 0, 0)
 
