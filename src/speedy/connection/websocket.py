@@ -1,42 +1,45 @@
-import json
-from collections.abc import AsyncIterator
-from enum import Flag
-from typing import Generic, Any, cast
+from enum import Enum
+from typing import Generic, Any, cast, Literal, AsyncGenerator
 
 from speedy.connection.base import ASGIConnection, empty_receive, empty_send
 from speedy.datastructures import Headers
 from speedy.exceptions import WebSocketException, WebSocketDisconnect
+from speedy.handlers.websocket_handlers.base import WebsocketRouteHandler
 from speedy.protocols.connection import UserT, AuthT, StateT
-from speedy.protocols.websocket import WebSocketMode
+from speedy.serialization.msgspec_hooks import default_serializer
+from speedy.status_code import WS_1000_NORMAL_CLOSURE
 from speedy.types import (
     Scope,
     ASGIReceiveCallable,
     ASGISendCallable,
     ASGIReceiveEvent,
     ASGISendEvent,
-    WebSocketSendEvent
+    WebSocketSendEvent, Serializer,
 )
+from speedy.types.asgi_types import WebSocketAcceptEvent, WebSocketCloseEvent
 
 
-class WebSocketState(Flag):
-    INIT = 'INIT'
-    CONNECT = 'CONNECT'
-    RECEIVE = 'RECEIVE'
-    DISCONNECT = 'DISCONNECT'
+class WebSocketState(Enum):
+    INIT = "INIT"
+    CONNECT = "CONNECT"
+    RECEIVE = "RECEIVE"
+    DISCONNECT = "DISCONNECT"
 
 
-DISCONNECT_MESSAGE = 'connection is disconnected'
+_ReceiveMode = Literal["text", "bytes"]
+
+DISCONNECT_MESSAGE = "connection is disconnected"
 
 
-class WebSocket(Generic[UserT, AuthT, StateT], ASGIConnection[UserT, AuthT, StateT]):
+class WebSocket(Generic[UserT, AuthT, StateT], ASGIConnection[WebsocketRouteHandler, UserT, AuthT, StateT]):
     def __init__(
             self,
             scope: Scope,
             receive: ASGIReceiveCallable = empty_receive,
-            send: ASGISendCallable = empty_send
+            send: ASGISendCallable = empty_send,
     ) -> None:
-        if scope['type'] != 'websocket':
-            raise WebSocketException('Invalid scope type. The type `websocket` was expected.')
+        if scope["type"] != "websocket":
+            raise WebSocketException("Invalid scope type. The type `websocket` was expected.")
         super().__init__(scope, self.receive_wrapper(receive), self.send_wrapper(send))
         self.is_connect: WebSocketState = WebSocketState.INIT
 
@@ -47,9 +50,9 @@ class WebSocket(Generic[UserT, AuthT, StateT], ASGIConnection[UserT, AuthT, Stat
             if self.is_connect == WebSocketState.DISCONNECT:
                 raise WebSocketDisconnect(DISCONNECT_MESSAGE)
             message = await receive()
-            if message['type'] == 'websocket.connect':
+            if message["type"] == "websocket.connect":
                 self.is_connect = WebSocketState.CONNECT
-            elif message['type'] == 'websocket.receive':
+            elif message["type"] == "websocket.receive":
                 self.is_connect = WebSocketState.RECEIVE
             else:
                 self.is_connect = WebSocketState.DISCONNECT
@@ -70,103 +73,125 @@ class WebSocket(Generic[UserT, AuthT, StateT], ASGIConnection[UserT, AuthT, Stat
     async def accept(
             self,
             subprotocol: str | None = None,
-            headers: Headers | dict[str, Any] | list[tuple[bytes, bytes]] | None = None
+            headers: Headers | dict[str, Any] | list[tuple[bytes, bytes]] | None = None,
     ) -> None:
+        """ Accept the incoming connection. This method should be called before receiving data. """
         if self.is_connect == WebSocketState.INIT:
             await self.receive()
 
-            _headers: list[tuple[bytes, bytes]] = []
+            raw: list[tuple[bytes, bytes]] = []
             if isinstance(headers, list):
-                _headers = headers
+                raw = headers
             elif isinstance(headers, dict):
-                _headers = Headers(headers).raw
+                raw = Headers(headers).raw
             elif isinstance(headers, Headers):
-                _headers = Headers(headers).raw
+                raw = Headers(headers).raw
 
             await self.send(
-                {
-                    'type': 'websocket.accept',
-                    'subprotocol': subprotocol,
-                    'headers': _headers
-                }
+                cast(
+                    WebSocketAcceptEvent, {
+                        "type": "websocket.accept",
+                        "subprotocol": subprotocol,
+                        "headers": raw,
+                    },
+                ),
             )
 
-    async def receive_data(self, mode: WebSocketMode) -> str | bytes:
+    async def close(self, code: int = WS_1000_NORMAL_CLOSURE, reason: str | None = None) -> None:
+        """ Send an `websocket.close` event. """
+        await self.send(
+            cast(
+                WebSocketCloseEvent, {
+                    "type": "websocket.close",
+                    "code": code,
+                    "reason": reason or "",
+                },
+            ),
+        )
+
+    async def receive_data(self, mode: _ReceiveMode) -> str | bytes:
         """ Receive an event and returns the data stored on it. """
         if self.is_connect == WebSocketState.INIT:
             await self.accept()
         event = await self.receive()
-        if event['type'] == 'websocket.disconnect':
-            raise WebSocketDisconnect('disconnect event')
+        if event["type"] == "websocket.disconnect":
+            raise WebSocketDisconnect("disconnect event")
+        if mode == "text":
+            return cast(str, event.get("text", ""))
+        return cast(bytes, event.get("bytes", ""))
 
-        if mode == 'text':
-            return cast(str, event.get('text', ''))
-        return cast(bytes, event.get('bytes', ''))
+    async def iter_data(self, mode: _ReceiveMode) -> AsyncGenerator[str | bytes, None]:
+        """ Continuously receive data and yield it. """
+        try:
+            while True:
+                yield await self.receive_data(mode)
+        except WebSocketDisconnect:
+            pass
 
     async def receive_text(self) -> str:
         """ Receive data as text. """
-        return await self.receive_data('text')
+        return await self.receive_data(mode="text")
 
     async def receive_bytes(self) -> bytes:
         """ Receive data as bytes. """
-        return await self.receive_data('bytes')
+        return await self.receive_data(mode="bytes")
 
-    async def receive_json(self, mode: WebSocketMode = 'text') -> Any:
+    async def receive_json(self, mode: _ReceiveMode = "text") -> Any:
         """ Receive data and decode it as json. """
-        data = await self.receive_data(mode)
+        data = await self.receive_data(mode=mode)
+        # TODO: Add decoder for json.
 
-        if mode == 'bytes':
-            data = data.decode('utf-8')
-        return json.loads(data)
+    async def receive_msgpack(self) -> Any:
+        """ Receive data and decode it as MessagePack. """
+        data = await self.receive_data(mode="bytes")
+        # TODO: Add decoder for msgpack.
 
-    async def iter_text(self) -> AsyncIterator[str]:
-        """ Continuously receive data and yield it in str. """
-        try:
-            while True:
-                yield await self.receive_text()
-        except WebSocketDisconnect:
-            pass
-
-    async def iter_bytes(self) -> AsyncIterator[bytes]:
-        """ Continuously receive data and yield it in bytes. """
-        try:
-            while True:
-                yield await self.receive_bytes()
-        except WebSocketDisconnect:
-            pass
-
-    async def iter_json(self, mode: WebSocketMode = 'text') -> AsyncIterator[Any]:
+    async def iter_json(self, mode: _ReceiveMode = "text") -> AsyncGenerator[Any, None]:
         """ Continuously receive data and yield it in json. """
-        try:
-            while True:
-                yield await self.receive_json(mode)
-        except WebSocketDisconnect:
-            pass
+        async for data in self.iter_data(mode=mode):
+            # TODO: Add decoder for json.
+            yield
 
-    async def send_data(self, data: str | bytes, mode: WebSocketMode = 'text', encoding: str = 'utf-8') -> None:
+    async def iter_msgpack(self) -> AsyncGenerator[Any, None]:
+        async for data in self.iter_data(mode="bytes"):
+            # TODO: Add decoder for msgpack.
+            yield
+
+    async def send_data(self, data: str | bytes, mode: _ReceiveMode = "text", encoding: str = "utf-8") -> None:
         """ Send a websocket event. """
         if self.is_connect == WebSocketState.INIT:
             await self.accept()
-        event: WebSocketSendEvent = {
-            'type': 'websocket.send',
-            'bytes': None,
-            'text': None
-        }
-        if mode == 'binary':
-            event['bytes'] = data if isinstance(data, bytes) else data.encode(encoding)
+        event = cast(
+            WebSocketSendEvent, {
+                "type": "websocket.send",
+                "bytes": None,
+                "text": None,
+            },
+        )
+        if mode == "binary":
+            event["bytes"] = data if isinstance(data, bytes) else data.encode(encoding)
         else:
-            event['text'] = data if isinstance(data, str) else data.decode(encoding)
+            event["text"] = data if isinstance(data, str) else data.decode(encoding)
         await self.send(event)
 
-    async def send_text(self, data: bytes | str, encoding: str = 'utf-8') -> None:
+    async def send_text(self, data: bytes | str, encoding: str = "utf-8") -> None:
         """ Send data in text key. """
         await self.send_data(data=data, encoding=encoding)
 
-    async def send_bytes(self, data: bytes, encoding: str = 'utf-8') -> None:
+    async def send_bytes(self, data: bytes, encoding: str = "utf-8") -> None:
         """ Send data in bytes key """
-        await self.send_data(data=data, mode='bytes', encoding=encoding)
+        await self.send_data(data=data, mode="bytes", encoding=encoding)
 
-    async def send_json(self, data: Any, mode: WebSocketMode = 'text', encoding: str = 'utf-8') -> None:
+    async def send_json(self, data: Any, mode: _ReceiveMode = "text", encoding: str = "utf-8") -> None:
         """ Send data as json. """
-        text = json.dumps(data, separators=(',', ':'), ensure_ascii=False)
-        await self.send_data(data=text, mode=mode, encoding=encoding)
+        # TODO: Add encoder for json.
+        # await self.send_data()
+
+    async def send_msgpack(self,
+            data: Any,
+            encoding: str = "utf-8",
+            serializer: Serializer = default_serializer,
+    ) -> None:
+        """ Send data as MessagePack. """
+        # TODO: Add encoder for msgpack
+        # await self.send_data()
