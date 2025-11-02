@@ -9,3 +9,5 @@ ResponseHeaders: TypeAlias = "Sequence[ResponseHeader] | Mapping[str, str]"
 ResponseCookies: TypeAlias = "Sequence[Cookie] | Mapping[str, str]"
 
 TypeEncodersMap: TypeAlias = Mapping[Any, Callable[[Any], Any]]
+
+TypeDecodersSequence: TypeAlias = Sequence[tuple[Callable[[Any], bool], Callable[[Any, Any], Any]]]
