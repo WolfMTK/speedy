@@ -12,3 +12,7 @@ class ConnectionException(Exception):
 
 class ValidationException(Exception):
     pass
+
+
+class SerializationException(SpeedyException):
+    pass
