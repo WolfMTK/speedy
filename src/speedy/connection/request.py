@@ -8,6 +8,7 @@ from speedy._parsers import parse_url_encoded_form_data
 from speedy.connection.base import ASGIConnection, empty_receive, empty_send
 from speedy.datastructures import FormMultiDict, Accept
 from speedy.exceptions import RequestException, InternalServerException
+from speedy.handlers.http_handlers.base import HTTPRouteHandler
 from speedy.protocols.connection import UserT, AuthT, StateT
 from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable, Method
 from speedy.types.asgi_types import HTTPServerPushEvent
@@ -23,7 +24,7 @@ SERVER_PUSH_HEADERS = {
 
 class Request(
     Generic[UserT, AuthT, StateT],
-    ASGIConnection["HTTPRouteHandler", UserT, AuthT, StateT],
+    ASGIConnection[HTTPRouteHandler, UserT, AuthT, StateT],
 ):
     """ The application Request class. """
 
