@@ -69,11 +69,6 @@ def default_deserializer(
             if predicate(target_type):
                 return decoder(target_type, value)
 
-    if type_decoders:
-        for predicate, decoder in type_decoders:
-            if predicate(target_type):
-                return decoder(target_type, value)
-
     if issubclass(target_type, (PurePath, ImmutableState, UUID)):
         return target_type(value)
 
