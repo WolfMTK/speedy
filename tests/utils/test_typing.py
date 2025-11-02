@@ -1,71 +1,68 @@
-from typing import Annotated, List, Dict
+from typing import Annotated, List, Any, Dict
 
+import pytest
 from typing_extensions import Required, NotRequired, ReadOnly
 
 from speedy.utils.typing import unwrap_annotation, get_origin_or_inner_type
 from tests.models import DataclassUser
 
 
-def test_unwrap_plain_type() -> None:
-    result = unwrap_annotation(int)
-    assert result == (int, (), set())
+@pytest.mark.parametrize(
+    "annotation, expected_core, expected_metadata, expected_wrappers",
+    [
+        (int, int, (), set()),
+        (Annotated[int, "foo"], int, ("foo",), {Annotated}),
+        (Annotated[str, "foo", 1], str, ("foo", 1), {Annotated}),
+        (Required[int], int, (), {Required}),
+        (NotRequired[str], str, (), {NotRequired}),
+        (ReadOnly[bool], bool, (), {ReadOnly}),
+        (List[int], List[int], (), set()),
+    ],
+)
+def test_unwrap_annotation_simple_cases(
+        annotation: Any,
+        expected_core: Any,
+        expected_metadata: tuple,
+        expected_wrappers: set,
+) -> None:
+    core, metadata, wrappers = unwrap_annotation(annotation)
+    assert core == expected_core
+    assert metadata == expected_metadata
+    assert wrappers == expected_wrappers
 
 
-def test_unwrap_annotated_simple() -> None:
-    result = unwrap_annotation(Annotated[int, "foo",])
-    assert result == (int, ("foo",), {Annotated})
+@pytest.mark.parametrize(
+    "annotation, expected_core, expected_metadata, expected_wrappers",
+    [
+        (Annotated[Required[int], "positive"], int, ("positive",), {Annotated, Required}),
+        (Required[Annotated[str, "non-empty"]], str, ("non-empty",), {Required, Annotated}),
+        (
+                ReadOnly[NotRequired[Annotated[Required[float], "currency"]]],
+                float,
+                ("currency",),
+                {ReadOnly, NotRequired, Annotated, Required},
+        ),
+    ],
+)
+def test_unwrap_annotation_nested_cases(
+        annotation: Any,
+        expected_core: Any,
+        expected_metadata: tuple,
+        expected_wrappers: set,
+) -> None:
+    core, metadata, wrappers = unwrap_annotation(annotation)
+    assert core == expected_core
+    assert metadata == expected_metadata
+    assert wrappers == expected_wrappers
 
 
-def test_unwrap_annotated_multiple_metadata() -> None:
-    result = unwrap_annotation(Annotated[str, "foo", 1])
-    assert result == (str, ("foo", 1), {Annotated})
-
-
-def test_unwrap_required():
-    result = unwrap_annotation(Required[int])
-    assert result == (int, (), {Required})
-
-
-def test_unwrap_notrequired():
-    result = unwrap_annotation(NotRequired[str])
-    assert result == (str, (), {NotRequired})
-
-
-def test_unwrap_readonly():
-    result = unwrap_annotation(ReadOnly[bool])
-    assert result == (bool, (), {ReadOnly})
-
-
-def test_unwrap_mixed_wrappers_annotated_outer() -> None:
-    typ = Annotated[Required[int], "positive"]
-    core, meta, wrappers = unwrap_annotation(typ)
-    assert core == int
-    assert meta == ("positive",)
-    assert wrappers == {Annotated, Required}
-
-
-def test_unwrap_mixed_wrappers_required_outer():
-    typ = Required[Annotated[str, "non-empty"]]
-    core, meta, wrappers = unwrap_annotation(typ)
-    assert core == str
-    assert meta == ("non-empty",)
-    assert wrappers == {Required, Annotated}
-
-
-def test_unwrap_deeply_nested():
-    typ = ReadOnly[NotRequired[Annotated[Required[float], "currency"]]]
-    core, meta, wrappers = unwrap_annotation(typ)
-    assert core == float
-    assert meta == ("currency",)
-    assert wrappers == {ReadOnly, NotRequired, Annotated, Required}
-
-
-def test_unwrap_non_wrapper_generic():
-    result = unwrap_annotation(List[int])
-    assert result == (List[int], (), set())
-
-
-def test_get_origin_or_inner_type() -> None:
-    assert get_origin_or_inner_type(List[DataclassUser]) == list
-    assert get_origin_or_inner_type(Annotated[List[DataclassUser], "foo"]) == list
-    assert get_origin_or_inner_type(Annotated[Dict[str, List[DataclassUser]], "foo"]) == dict
+@pytest.mark.parametrize(
+    "annotation, expected_origin",
+    [
+        (List[DataclassUser], list),
+        (Annotated[List[DataclassUser], "foo"], list),
+        (Annotated[Dict[str, List[DataclassUser]], "foo"], dict),
+    ],
+)
+def test_get_origin_or_inner_type(annotation: Any, expected_origin: Any) -> None:
+    assert get_origin_or_inner_type(annotation) == expected_origin
