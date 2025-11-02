@@ -6,9 +6,12 @@ from ipaddress import IPv4Address, IPv4Interface, IPv4Network, IPv6Address, IPv6
 from pathlib import Path, PurePath
 from re import Pattern
 from typing import Any
+from uuid import UUID
 
-from speedy.datastructures import SecretBytes, SecretString
+from speedy.datastructures import SecretBytes, SecretString, ImmutableState
 from speedy.types import TypeEncodersMap
+from speedy.types.composite_types import TypeDecodersSequence
+from speedy.utils.typing import get_origin_or_inner_type
 
 DEFAULT_TYPE_ENCODERS: TypeEncodersMap = {
     Path: str,
@@ -38,9 +41,9 @@ DEFAULT_TYPE_ENCODERS: TypeEncodersMap = {
 
 def default_serializer(
         value: Any,
-        type_encoders: Mapping[Any, Callable[[Any], Any]] | None = None
+        type_encoders: Mapping[Any, Callable[[Any], Any]] | None = None,
 ) -> Any:
-    """ Transform values non-natively supported by ```msgspec` """
+    """ Transform values non-natively supported by `msgspec`. """
     type_encoders = {**DEFAULT_TYPE_ENCODERS, **(type_encoders or {})}
     for base in value.__class__.__mro__[:-1]:
         try:
@@ -52,7 +55,40 @@ def default_serializer(
     raise TypeError(f"Unsupported type: {type(value)}")
 
 
-def encode_msgpack(value: Any, serializer: Callable[[Any], Any] | None): ...
+def default_deserializer(
+        target_type: Any, value: Any, type_decoders: TypeDecodersSequence | None = None,
+) -> Any:
+    """ Transform values non-natively supported by `msgspec`. """
+    runtime_type = get_origin_or_inner_type(target_type) or target_type
+
+    if isinstance(value, runtime_type):
+        return value
+
+    if type_decoders:
+        for predicate, decoder in type_decoders:
+            if predicate(target_type):
+                return decoder(target_type, value)
+
+    if type_decoders:
+        for predicate, decoder in type_decoders:
+            if predicate(target_type):
+                return decoder(target_type, value)
+
+    if issubclass(target_type, (PurePath, ImmutableState, UUID)):
+        return target_type(value)
+
+    if issubclass(target_type, SecretBytes) and isinstance(value, (bytes, str)):
+        return SecretBytes(value.encode("utf-8") if isinstance(value, str) else value)
+
+    if issubclass(target_type, SecretString) and isinstance(value, str):
+        return SecretString(value)
+
+    raise TypeError(f"Unsupported type: {type(value)!r}")
 
 
-def encode_json(value: Any, serializer: Callable[[Any], Any] | None = None) -> bytes: ...
+def encode_msgpack(value: Any, serializer: Callable[[Any], Any] | None):
+    ...
+
+
+def encode_json(value: Any, serializer: Callable[[Any], Any] | None = None) -> bytes:
+    ...
