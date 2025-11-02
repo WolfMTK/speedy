@@ -28,13 +28,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ujson = ["ujson<=5.11.0"]
-orjson = ["orjson<=3.11.3"]
 dev = [
     "covdefaults",
     "pytest<=8.4.2",
-    "ujson<=5.11.0",
-    "orjson<=3.11.3",
     "httpx<=0.28.1",
     "pytest-cov",
     "time-machine<=2.19.0",
