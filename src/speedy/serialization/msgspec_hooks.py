@@ -1,3 +1,4 @@
+import json
 from collections import deque
 from collections.abc import Callable, Mapping
 from datetime import datetime, date, time
@@ -9,6 +10,7 @@ from typing import Any
 from uuid import UUID
 
 from speedy.datastructures import SecretBytes, SecretString, ImmutableState
+from speedy.exceptions.base import SerializationException
 from speedy.types import TypeEncodersMap
 from speedy.types.composite_types import TypeDecodersSequence
 from speedy.utils.typing import get_origin_or_inner_type
@@ -86,9 +88,22 @@ def default_deserializer(
     raise TypeError(f"Unsupported type: {type(value)!r}")
 
 
-def encode_msgpack(value: Any, serializer: Callable[[Any], Any] | None):
-    ...
-
-
 def encode_json(value: Any, serializer: Callable[[Any], Any] | None = None) -> bytes:
+    """ Encode a value into JSON. """
+    try:
+        def _adapter_encode(value: Any) -> Any:
+            if serializer is not None:
+                try:
+                    return serializer(value) if serializer else default_serializer(value)
+                except (TypeError, ValueError, AttributeError):
+                    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+            raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+        json_str = json.dumps(value, default=_adapter_encode, ensure_ascii=False, separators=(",", ":"))
+        return json_str.encode("utf-8")
+    except (TypeError, ValueError, OverflowError) as err:
+        raise SerializationException(str(err)) from err
+
+
+def encode_msgpack(value: Any, serializer: Callable[[Any], Any] | None):
     ...
