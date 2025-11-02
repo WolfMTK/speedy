@@ -91,19 +91,26 @@ def default_deserializer(
 def encode_json(value: Any, serializer: Callable[[Any], Any] | None = None) -> bytes:
     """ Encode a value into JSON. """
     try:
-        def _adapter_encode(value: Any) -> Any:
-            if serializer is not None:
-                try:
-                    return serializer(value) if serializer else default_serializer(value)
-                except (TypeError, ValueError, AttributeError):
-                    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
-            raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
-
-        json_str = json.dumps(value, default=_adapter_encode, ensure_ascii=False, separators=(",", ":"))
+        json_str = json.dumps(
+            value,
+            default=lambda obj: serializer(obj) if serializer else default_serializer(obj),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
         return json_str.encode("utf-8")
     except (TypeError, ValueError, OverflowError) as err:
         raise SerializationException(str(err)) from err
 
 
-def encode_msgpack(value: Any, serializer: Callable[[Any], Any] | None):
-    ...
+def encode_msgpack(value: Any, serializer: Callable[[Any], Any] | None = None) -> bytes:
+    """ Encode a value into MessagePack. """
+    import msgpack
+
+    try:
+        return msgpack.packb(
+            value,
+            default=lambda obj: serializer(obj) if serializer else default_serializer(obj),
+            use_bin_type=True,
+        )
+    except (TypeError, ValueError) as err:
+        raise SerializationException(f"Unable to serialize value {type(value)}: {err}") from err
