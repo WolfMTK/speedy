@@ -9,11 +9,14 @@ from typing import Any
 from unittest.mock import Mock, patch
 from uuid import UUID
 
+import msgpack
 import pytest
 
 from speedy.datastructures import SecretBytes, SecretString, ImmutableState
 from speedy.exceptions.base import SerializationException
-from speedy.serialization.msgspec_hooks import default_serializer, default_deserializer, encode_json
+from speedy.serialization.msgspec_hooks import default_serializer, default_deserializer, encode_json, encode_msgpack
+
+DATETIME = datetime(2023, 10, 1, 12, 0, 0)
 
 
 @pytest.mark.parametrize(
@@ -171,8 +174,8 @@ def test_encode_with_custom_serializer() -> None:
             return obj.isoformat()
         raise TypeError()
 
-    result = encode_json(datetime(2023, 10, 1, 12, 0, 0), serializer=custom_serializer)
-    expected = json.dumps(datetime(2023, 10, 1, 12, 0, 0).isoformat(), ensure_ascii=False).encode("utf-8")
+    result = encode_json(DATETIME, serializer=custom_serializer)
+    expected = json.dumps(DATETIME.isoformat(), ensure_ascii=False).encode("utf-8")
     assert result == expected
 
 
@@ -182,14 +185,14 @@ def test_unsupported_type_without_serializer() -> None:
 
     with pytest.raises(SerializationException) as exc_info:
         encode_json(UnsupportedType())
-
-    assert "not JSON serializable" in str(exc_info.value)
+    str(exc_info.value)
+    assert "Unsupported type" in str(exc_info.value)
 
 
 def test_json_library_errors() -> None:
     with patch("json.dumps", side_effect=OverflowError("Number too large")):
         with pytest.raises(SerializationException) as exc_info:
-            encode_json(42)
+            encode_json(0)
 
     assert "Number too large" in str(exc_info.value)
 
@@ -200,3 +203,53 @@ def test_utf8_encoding() -> None:
     assert json.loads(result) == value
     json_string = result.decode("utf-8")
     assert "Hello" in json_string
+
+
+@pytest.mark.parametrize(
+    "cases", [
+        ({"key": "value"}, {"key": "value"}),
+        ([1, 2, 3], [1, 2, 3]),
+        ("hello", "hello"),
+        (42, 42),
+        (3.14, 3.14),
+        (True, True),
+        (None, None),
+        (b"raw_bytes", b"raw_bytes"),
+    ],
+)
+def test_encode_builtin_types(cases: dict[str, str] | list[int] | str | int | float | bool | None | bytes) -> None:
+    value, expected = cases
+    encoded = encode_msgpack(value)
+    decoded = msgpack.unpackb(encoded, raw=False)
+    assert decoded == expected
+
+
+def test_encode_msgpack_with_custom_serializer():
+    def custom_serializer(obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        raise TypeError()
+
+    encoded = encode_msgpack(DATETIME, serializer=custom_serializer)
+    decoded = msgpack.unpackb(encoded, raw=False)
+    assert decoded == DATETIME.isoformat()
+
+
+def test_unsupported_msgpack_type_without_serializer():
+    class UnsupportedType:
+        pass
+
+    with pytest.raises(SerializationException) as exc_info:
+        encode_msgpack(UnsupportedType())
+
+    assert "Unable to serialize" in str(exc_info.value)
+
+
+def test_serializer_msgpack_fails():
+    def failing_serializer(obj):
+        raise ValueError("I don't know how to serialize this!")
+
+    with pytest.raises(SerializationException) as exc_info:
+        encode_msgpack(DATETIME, serializer=failing_serializer)
+
+    assert "I don't know how to serialize this!" in str(exc_info.value)
