@@ -55,21 +55,26 @@ instantiable_type_mapping = {
 
 def unwrap_annotation(annotation: Any) -> tuple[Any, tuple[Any, ...], set[Any],]:
     """ Remove "wrapper" annotation types. """
-    origin = get_origin(annotation)
-    wrappers = set()
     metadata = []
-    while origin in wrapper_type_set:
-        wrappers.add(origin)
-        annotation, *meta = get_args(annotation)
-        metadata.extend(meta)
+    wrappers = set()
+    while True:
         origin = get_origin(annotation)
+        if origin not in wrapper_type_set:
+            break
+
+        wrappers.add(origin)
+        args = get_args(annotation)
+
+        if origin is Annotated:
+            annotation, *meta = args
+            metadata.extend(meta)
+        else:
+            annotation = args[0]
     return annotation, tuple(metadata), wrappers
 
 
 def get_origin_or_inner_type(annotation: Any) -> Any:
     """ Get origin or unwrap it. Returns None for non-generic types. """
-    origin = get_origin(annotation)
-    if origin in wrapper_type_set:
-        inner, _, _ = unwrap_annotation(annotation)
-        origin = get_origin_or_inner_type(inner)
+    inner, _, _ = unwrap_annotation(annotation)
+    origin = get_origin(inner)
     return instantiable_type_mapping.get(origin, origin)
