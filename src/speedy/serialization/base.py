@@ -2,6 +2,7 @@ from collections import deque
 from collections.abc import Callable, Mapping
 from datetime import datetime, date, time
 from decimal import Decimal
+from functools import partial
 from ipaddress import IPv4Address, IPv4Interface, IPv4Network, IPv6Address, IPv6Interface, IPv6Network
 from pathlib import Path, PurePath
 from re import Pattern
@@ -9,7 +10,7 @@ from typing import Any
 from uuid import UUID
 
 from speedy.datastructures import SecretBytes, SecretString, ImmutableState
-from speedy.types import TypeEncodersMap
+from speedy.types import TypeEncodersMap, Serializer
 from speedy.types.composite_types import TypeDecodersSequence
 from speedy.utils.typing import get_origin_or_inner_type
 
@@ -79,3 +80,10 @@ def default_deserializer(
         return SecretString(value)
 
     raise TypeError(f"Unsupported type: {type(value)!r}")
+
+
+def get_serializer(type_encoders: TypeEncodersMap | None = None) -> Serializer:
+    """ Get the serializer for the given type encoders. """
+    if type_encoders:
+        return partial(default_serializer, type_encoders=type_encoders)
+    return default_serializer
