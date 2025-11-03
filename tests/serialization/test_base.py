@@ -1,4 +1,3 @@
-import json
 from collections import deque
 from datetime import datetime, date, time
 from decimal import Decimal
@@ -6,16 +5,13 @@ from ipaddress import IPv4Address, IPv6Network
 from pathlib import Path, PurePath
 from re import compile as re_compile
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 from uuid import UUID
 
-import msgpack
 import pytest
 
 from speedy.datastructures import SecretBytes, SecretString, ImmutableState
-from speedy.exceptions.base import SerializationException
-from speedy.serialization import encode_json, encode_msgpack
-from speedy.serialization.base import default_serializer, default_deserializer
+from speedy.serialization.base import default_serializer, default_deserializer, get_serializer
 
 DATETIME = datetime(2023, 10, 1, 12, 0, 0)
 
@@ -147,3 +143,20 @@ def test_no_matching_type_decoder() -> None:
     result = default_deserializer(UUID, uuid_str, type_decoders=type_decoders)
     mock_decoder.assert_not_called()
     assert isinstance(result, UUID)
+
+
+def test_get_serializer() -> None:
+    value, expected_encoder = (Path("/tmp"), str)
+    serializer = get_serializer()
+    encoder = serializer(value)
+    assert callable(encoder)
+    result = encoder(value)
+    expected_result = expected_encoder(value)  # noqa
+    assert result == expected_result
+
+    custom_encoder = {
+        Path: lambda v: f"custom:{v}",
+    }
+    serializer = get_serializer(type_encoders=custom_encoder)
+    encoder = serializer(Path("foo"))
+    assert encoder(Path("/foo")) == "custom:/foo" or encoder(Path("/foo")) == "custom:\\foo"
