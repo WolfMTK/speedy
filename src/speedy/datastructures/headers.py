@@ -2,7 +2,7 @@ import re
 from abc import abstractmethod, ABC
 from collections.abc import Mapping, Iterator
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, TYPE_CHECKING
+from typing import Any, ClassVar
 
 from speedy._multipart import parse_content_header
 from speedy.exceptions.http_exceptions import ImproperlyConfiguredException
