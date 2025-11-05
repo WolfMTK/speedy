@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import itertools
 import re
 from collections.abc import Iterable, Mapping
@@ -8,7 +10,8 @@ from speedy import BackgroundTask, BackgroundTasks, MediaType
 from speedy.connection.request import Request
 from speedy.datastructures import MutableHeaders, Cookie, ETag
 from speedy.exceptions.http_exceptions import ImproperlyConfiguredException
-from speedy.serialization.msgspec_hooks import encode_msgpack, default_serializer, encode_json
+from speedy.serialization import encode_json, encode_msgpack
+from speedy.serialization.base import default_serializer
 from speedy.status_code import HTTP_200_OK, HTTP_204_NO_CONTENT, HTTP_304_NOT_MODIFIED
 from speedy.types import (
     Scope,
