@@ -1,10 +1,13 @@
 from collections.abc import Mapping, Callable
-from typing import TypeAlias, Sequence, TYPE_CHECKING, Any
+from typing import TypeAlias, Sequence, TYPE_CHECKING, Any, MutableMapping, Union
+
+
 
 if TYPE_CHECKING:
     from speedy.datastructures import Cookie, ResponseHeader
     from speedy.params import ParameterKwarg
     from speedy.types.asgi_types import ASGIApplication
+    from .callable_types import ExceptionHandler
 
 ResponseHeaders: TypeAlias = "Sequence[ResponseHeader] | Mapping[str, str]"
 
@@ -17,3 +20,5 @@ TypeDecodersSequence: TypeAlias = Sequence[tuple[Callable[[Any], bool], Callable
 Middleware: TypeAlias = Callable[..., "ASGIApplication"]
 
 ParametersMap: TypeAlias = "Mapping[str, ParameterKwarg]"
+
+ExceptionHandlersMap: TypeAlias = "MutableMapping[Union[int, type[Exception]], ExceptionHandler]"
