@@ -1,8 +1,8 @@
+import asyncio
 from collections.abc import Mapping
 from typing import Generator, Any
 from unittest.mock import Mock
 
-import anyio
 import pytest
 from httpx import Request
 
@@ -24,7 +24,7 @@ def _make_client(app):
     client.app = app
 
     def mock_call(func, *args, **kwargs):
-        return anyio.run(func, *args, **kwargs)
+        return asyncio.run(func(*args, **kwargs))
 
     client.blocking_portal = Mock()
     client.blocking_portal.call = mock_call

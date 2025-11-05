@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 from io import BytesIO
 from types import GeneratorType
 from typing import TYPE_CHECKING, TypeVar, Generic, TypedDict, Any, cast
 from urllib.parse import unquote
 
-import anyio
 from httpx import AsyncBaseTransport, Response, ByteStream, BaseTransport
 
 from speedy.status_code import HTTP_500_INTERNAL_SERVER_ERROR
@@ -31,7 +31,7 @@ class ConnectionUpgradeExceptionError(Exception):
 
 class SendReceiveContext(TypedDict):
     request_complete: bool
-    response_complete: anyio.Event
+    response_complete: asyncio.Event
     raw_kwargs: dict[str, Any,]
     response_started: bool
     template: str | None
@@ -174,7 +174,7 @@ class TestClientTransport(AsyncBaseTransport, Generic[T]):
         )
 
         stream = BytesIO()
-        response_complete = anyio.Event()
+        response_complete = asyncio.Event()
         context: SendReceiveContext = {
             "response_complete": response_complete,
             "request_complete": False,
