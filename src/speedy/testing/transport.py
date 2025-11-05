@@ -51,7 +51,7 @@ class TestClientTransport(AsyncBaseTransport, Generic[T]):
 
     @staticmethod
     def create_receive(request: Request, context: SendReceiveContext) -> ASGIReceiveCallable:
-        body_source = request.read() or b""
+        body_source = cast("bytes | str | GeneratorType", request.read() or b"")
         is_generator = isinstance(body_source, GeneratorType)
         generator = body_source if is_generator else None
 
