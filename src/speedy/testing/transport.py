@@ -183,7 +183,6 @@ class TestClientTransport(AsyncBaseTransport, Generic[T]):
             "template": None,
             "context": None,
         }
-
         try:
             await self.client.app(
                 scope,
@@ -196,7 +195,7 @@ class TestClientTransport(AsyncBaseTransport, Generic[T]):
             return Response(
                 status_code=HTTP_500_INTERNAL_SERVER_ERROR,
                 headers=[],
-                stream=ByteStream(b""),
+                stream=ByteStream(stream.read()),
                 request=request,
             )
 
@@ -206,11 +205,9 @@ class TestClientTransport(AsyncBaseTransport, Generic[T]):
             return Response(
                 status_code=HTTP_500_INTERNAL_SERVER_ERROR,
                 headers=[],
-                stream=ByteStream(b""),
+                stream=ByteStream(stream.read()),
                 request=request,
             )
-
-        stream.seek(0)
         final_stream = ByteStream(stream.read())
         response = Response(
             status_code=context["raw_kwargs"]["status_code"],
