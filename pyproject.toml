@@ -33,7 +33,7 @@ msgpack = [
 ]
 dev = [
     "covdefaults",
-    "pytest<=9.0.1",
+    "pytest<=9.0.2",
     "httpx<=0.28.1",
     "pytest-cov",
     "time-machine<=3.1.0",
