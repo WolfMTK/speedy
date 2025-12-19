@@ -16,6 +16,10 @@ from .asgi_types import (
     HTTPResponseStartEvent,
     HTTPDisconnectEvent,
     HTTPRequestEvent,
+    LifeSpanSendMessage,
+    LifeSpanReceiveMessage,
+    LifespanStartupEvent,
+    LifespanShutdownEvent,
 )
 from .callable_types import Serializer
 from .composite_types import TypeEncodersMap, ResponseCookies, ResponseHeaders, Scopes
@@ -38,6 +42,10 @@ __all__ = (
     "HTTPResponseStartEvent",
     "HTTPSendMessage",
     "HttpScope",
+    "LifeSpanReceiveMessage",
+    "LifeSpanSendMessage",
+    "LifespanShutdownEvent",
+    "LifespanStartupEvent",
     "Method",
     "RawHeaders",
     "ResponseCookies",
