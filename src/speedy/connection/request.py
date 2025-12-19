@@ -112,7 +112,7 @@ class Request(
                     body=await self.body(),
                     boundary=options.get("boundary", "").encode(),
                     multipart_limit=multipart_limit,
-                ).parser()
+                ).parse()
             elif content_type == RequestEncodingType.URL_ENCODED:
                 form_data = parse_url_encoded_form_data(
                     await self.body(),

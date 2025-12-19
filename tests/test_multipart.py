@@ -51,7 +51,7 @@ def test_parser_correct_fields():
     )
     boundary = b'--boundary'
     parser = MultiPartFormParser(body, boundary)
-    parsed_data = parser.parser()
+    parsed_data = parser.parse()
 
     field = parsed_data['foo']
     assert field == 'text_foo'
@@ -71,7 +71,7 @@ def test_parser_form_parts_empty():
     body = b'--boundary--'
     boundary = b'--boundary'
     parser = MultiPartFormParser(body, boundary)
-    parsed_data = parser.parser()
+    parsed_data = parser.parse()
     assert parsed_data == {}
 
 
@@ -84,7 +84,7 @@ def test_parser_complex_filename():
     )
     boundary = b'--boundary'
     parser = MultiPartFormParser(body, boundary)
-    parsed_data = parser.parser()
+    parsed_data = parser.parse()
 
     field = parsed_data['file']
     assert isinstance(field, UploadFile)
