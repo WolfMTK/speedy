@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Self
 
-from speedy.types import Empty, EmptyType
+from speedy.types import EmptyType
 
 if TYPE_CHECKING:
     from speedy.datastructures import Accept, URL, UploadFile, Headers
