@@ -16,8 +16,8 @@ _param = re.compile(rf";\s*{_token}=(?:{_token}|{_quoted})", re.ASCII)
 
 def parse_content_header(value: str) -> tuple[str, dict[str, str]]:
     """ Parse content-type and content-disposition header values. """
-    value = _firefox_quote_escape.sub('%22', value)
-    position = value.find(';')
+    value = _firefox_quote_escape.sub("%22", value)
+    position = value.find(";")
     options = {}
     if position != -1:
         for val in _param.finditer(value[position:]):
@@ -26,27 +26,15 @@ def parse_content_header(value: str) -> tuple[str, dict[str, str]]:
     return value.strip().lower(), options
 
 
-class _Parser:
-    def parse_body(self) -> list[bytes]:
-        """ Split the body using the boundary and validate the number of form parts is within the allowed limit. """
-        form_parts = self.body.split(self.boundary, self.multipart_limit + 3)[1:-1]
-
-        if len(form_parts) > self.multipart_limit:
-            raise ValidationException(
-                f'number of form parts exceeds allowed limit of {self.multipart_limit}',
-            )
-        return form_parts
-
-
-@dataclass
+@dataclass(slots=True)
 class _FormPart:
     file_name: None | str = field(default=None)
-    charset: str = 'utf-8'
+    charset: str = field(default="utf-8")
     field_name: None | str = field(default=None)
     headers: list[tuple[str, str]] = field(default_factory=list)
 
 
-class MultiPartFormParser(_Parser):
+class MultiPartFormParser:
     """ The parser multipart form data. """
 
     def __init__(
@@ -59,7 +47,17 @@ class MultiPartFormParser(_Parser):
         self.boundary = boundary
         self.multipart_limit = multipart_limit
 
-    def parser(self) -> dict[str, Any,]:
+    def parse_body(self) -> list[bytes]:
+        """ Split the body using the boundary and validate the number of form parts is within the allowed limit. """
+        form_parts = self.body.split(self.boundary, self.multipart_limit + 3)[1:-1]
+
+        if len(form_parts) > self.multipart_limit:
+            raise ValidationException(
+                f"number of form parts exceeds allowed limit of {self.multipart_limit}",
+            )
+        return form_parts
+
+    def parse(self) -> dict[str, Any,]:
         """ Parse multipart form data. """
         fields = defaultdict(list)
 
@@ -94,7 +92,7 @@ class MultiPartFormParser(_Parser):
             form: bytes,
             line_index: int,
     ) -> None:
-        post_data = form[line_index:].rstrip(b'\r\n--').lstrip(b'\r\n')
+        post_data = form[line_index:].rstrip(b"\r\n--").lstrip(b"\r\n")
         if form_part.file_name:
             form_file = UploadFile(
                 filename=form_part.file_name,
