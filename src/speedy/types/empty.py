@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Final
+from typing import Final, Literal
 
 
 class _EmptyEnum(Enum):
@@ -9,3 +9,4 @@ class _EmptyEnum(Enum):
 
 
 Empty: Final = _EmptyEnum.EMPTY
+EmptyType = Literal[_EmptyEnum.EMPTY]
