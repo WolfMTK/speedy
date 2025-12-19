@@ -451,6 +451,7 @@ name = "speedy"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
+    { name = "anyio" },
     { name = "typing-extensions" },
 ]
 
@@ -472,6 +473,7 @@ msgpack = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anyio", specifier = ">=4.10.0" },
     { name = "covdefaults", marker = "extra == 'dev'" },
     { name = "httpx", marker = "extra == 'dev'", specifier = "<=0.28.1" },
     { name = "msgpack", marker = "extra == 'dev'", specifier = "<=1.1.2" },
