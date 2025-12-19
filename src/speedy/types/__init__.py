@@ -19,7 +19,7 @@ from .asgi_types import (
 )
 from .callable_types import Serializer
 from .composite_types import TypeEncodersMap, ResponseCookies, ResponseHeaders
-from .empty import Empty
+from .empty import Empty, EmptyType
 from .helper_types import AnyIOBackend
 from .structure_types import RawHeaders, ScopeHeaders, StateType
 
@@ -46,6 +46,7 @@ __all__ = (
     "ResponseCookies",
     "TypeEncodersMap",
     "Empty",
+    "EmptyType",
     "HTTPResponseStartEvent",
     "AnyIOBackend",
     "HTTPDisconnectEvent",
