@@ -3,7 +3,7 @@ from typing import Generic, TypeVar, Any
 
 from speedy import ScopeType
 from speedy.connection.base import ASGIConnection
-from speedy.types import Scopes, SAMESITE
+from speedy.types import Scopes, SAMESITE, ScopeSession, Message
 
 ConfigT = TypeVar("ConfigT", bound="BaseBackendConfig")
 BaseSessionBackendT = TypeVar("BaseSessionBackendT", bound="BaseSessionBackend")
@@ -33,3 +33,7 @@ class BaseSessionBackend(ABC, Generic[ConfigT]):
     @abstractmethod
     async def load_from_connection(self, connection: ASGIConnection) -> dict[str, Any,]:
         """ Load session data from a connection and return it as a dictionary to be used in the application scope. """
+
+    @abstractmethod
+    async def store_in_message(self, scope_session: ScopeSession, message: Message, connection: ASGIConnection) -> None:
+        """ Store the necessary information in the outgoing `Message`. """
