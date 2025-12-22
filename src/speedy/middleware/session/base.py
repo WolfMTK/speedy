@@ -1,7 +1,8 @@
-from abc import ABC
-from typing import Generic, TypeVar
+from abc import ABC, abstractmethod
+from typing import Generic, TypeVar, Any
 
 from speedy import ScopeType
+from speedy.connection.base import ASGIConnection
 from speedy.types import Scopes, SAMESITE
 
 ConfigT = TypeVar("ConfigT", bound="BaseBackendConfig")
@@ -28,3 +29,7 @@ class BaseBackendConfig(ABC, Generic[BaseSessionBackendT]):
 class BaseSessionBackend(ABC, Generic[ConfigT]):
     def __init__(self, config: ConfigT) -> None:
         self.config = config
+
+    @abstractmethod
+    async def load_from_connection(self, connection: ASGIConnection) -> dict[str, Any,]:
+        """ Load session data from a connection and return it as a dictionary to be used in the application scope. """
