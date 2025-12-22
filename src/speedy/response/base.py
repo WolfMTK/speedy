@@ -15,8 +15,8 @@ from speedy.serialization.base import default_serializer
 from speedy.status_code import HTTP_200_OK, HTTP_204_NO_CONTENT, HTTP_304_NOT_MODIFIED
 from speedy.types import (
     Scope,
-    ASGIReceiveCallable,
-    ASGISendCallable,
+    Receive,
+    Send,
     SAMESITE,
     ResponseHeaders,
     Empty,
@@ -72,7 +72,7 @@ class ASGIResponse:
         self.is_head_response = is_head_response
         self.status_code: int = status_code
 
-    async def __call__(self, scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable) -> None:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         await self.start_response(send)
 
         if self.is_head_response:
@@ -96,7 +96,7 @@ class ASGIResponse:
         if self.background is not None:
             await self.background()
 
-    async def start_response(self, send: ASGISendCallable) -> None:
+    async def start_response(self, send: Send) -> None:
         """ Emit the start event of the response. This event includes the headers and status codes. """
         event: HTTPResponseStartEvent = {
             "type": "http.response.start",
@@ -105,7 +105,7 @@ class ASGIResponse:
         }
         await send(event)
 
-    async def send_body(self, send: ASGISendCallable, receive: ASGIReceiveCallable) -> None:
+    async def send_body(self, send: Send, receive: Receive) -> None:
         """ Emit the response body. """
         event: HTTPResponseBodyEvent = {
             "type": "http.response.body",

@@ -3,7 +3,7 @@ from typing import Protocol, TypeVar, Any
 
 from speedy.datastructures import URL, Headers, State, QueryParams, Address
 from speedy.protocols.app import ASGIApplication
-from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable
+from speedy.types import Scope, Receive, Send
 
 AuthT = TypeVar("AuthT")
 UserT = TypeVar("UserT")
@@ -18,11 +18,11 @@ class Connection(Protocol[HandlerT, UserT, AuthT, StateT]):
 
     @property
     @abstractmethod
-    def receive(self) -> ASGIReceiveCallable: ...
+    def receive(self) -> Receive: ...
 
     @property
     @abstractmethod
-    def send(self) -> ASGISendCallable: ...
+    def send(self) -> Send: ...
 
     @property
     @abstractmethod

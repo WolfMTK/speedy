@@ -11,14 +11,14 @@ from speedy.response import PlainTextResponse
 from speedy.status_code import HTTP_404_NOT_FOUND, WS_1000_NORMAL_CLOSURE
 from speedy.types import Scope
 from speedy.types.asgi_types import (
-    ASGIReceiveCallable,
-    ASGISendCallable
+    Receive,
+    Send
 )
 from speedy.utils.convertors import CONVERTOR_TYPES, Convertor
 
 
 class BaseRoute(AbstractRoute, ABC):
-    async def __call__(self, scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable) -> None:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         match, child_scope = self.matches(scope)
 
         match Match:
@@ -33,16 +33,16 @@ class BaseRoute(AbstractRoute, ABC):
 
     async def _send_response_not_found(self,
                                        scope: Scope,
-                                       receive: ASGIReceiveCallable,
-                                       send: ASGISendCallable) -> None:
+                                       receive: Receive,
+                                       send: Send) -> None:
         response = PlainTextResponse('Not Found', status_code=HTTP_404_NOT_FOUND)
         await response(scope, receive, send)
 
     async def _close_websocket(
             self,
             scope: Scope,
-            receive: ASGIReceiveCallable,
-            send: ASGISendCallable
+            receive: Receive,
+            send: Send
     ) -> None:
         websocket_close = WebSocketClose(WS_1000_NORMAL_CLOSURE)
         await websocket_close(scope, receive, send)

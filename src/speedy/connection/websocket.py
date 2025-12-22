@@ -10,10 +10,10 @@ from speedy.serialization.msgspec_hooks import default_serializer
 from speedy.status_code import WS_1000_NORMAL_CLOSURE
 from speedy.types import (
     Scope,
-    ASGIReceiveCallable,
-    ASGISendCallable,
+    Receive,
+    Send,
     ASGIReceiveEvent,
-    ASGISendEvent,
+    Message,
     WebSocketSendEvent, Serializer,
 )
 from speedy.types.asgi_types import WebSocketAcceptEvent, WebSocketCloseEvent
@@ -35,15 +35,15 @@ class WebSocket(Generic[UserT, AuthT, StateT], ASGIConnection[WebsocketRouteHand
     def __init__(
             self,
             scope: Scope,
-            receive: ASGIReceiveCallable = empty_receive,
-            send: ASGISendCallable = empty_send,
+            receive: Receive = empty_receive,
+            send: Send = empty_send,
     ) -> None:
         if scope["type"] != "websocket":
             raise WebSocketException("Invalid scope type. The type `websocket` was expected.")
         super().__init__(scope, self.receive_wrapper(receive), self.send_wrapper(send))
         self.is_connect: WebSocketState = WebSocketState.INIT
 
-    def receive_wrapper(self, receive: ASGIReceiveCallable) -> ASGIReceiveCallable:
+    def receive_wrapper(self, receive: Receive) -> Receive:
         """ Wrap receive to set connection and validate events. """
 
         async def wrapped_receive() -> ASGIReceiveEvent:
@@ -60,10 +60,10 @@ class WebSocket(Generic[UserT, AuthT, StateT], ASGIConnection[WebsocketRouteHand
 
         return wrapped_receive
 
-    def send_wrapper(self, send: ASGISendCallable) -> ASGISendCallable:
+    def send_wrapper(self, send: Send) -> Send:
         """ Wrap send to ensure that state is not disconnected. """
 
-        async def wrapped_send(message: ASGISendEvent) -> None:
+        async def wrapped_send(message: Message) -> None:
             if self.is_connect == WebSocketState.DISCONNECT:
                 raise WebSocketDisconnect(DISCONNECT_MESSAGE)
             await send(message)

@@ -5,7 +5,7 @@ if TYPE_CHECKING:
     from speedy.protocols.app import ASGIApplication
     from speedy.response.base import Response
     from speedy.connection.request import Request
-    from speedy.types import Scope, ASGISendEvent
+    from speedy.types import Scope, Message
     from .helper_types import SyncOrAsyncUnion
 
 AfterExceptionHookHandler: TypeAlias = "Callable[[ExceptionT, Scope], SyncOrAsyncUnion[None]]"
@@ -30,7 +30,7 @@ AsyncBeforeRequestHookHandler: TypeAlias = "Callable[[Request], Awaitable[Any]]"
 
 BeforeRequestHookHandler: TypeAlias = "Callable[[Request], Any | Awaitable[Any]]"
 
-BeforeMessageSendHookHandler: TypeAlias = "Callable[[ASGISendEvent, Scope], SyncOrAsyncUnion[None]]"
+BeforeMessageSendHookHandler: TypeAlias = "Callable[[Message, Scope], SyncOrAsyncUnion[None]]"
 
 Serializer: TypeAlias = Callable[[Any], Any]
 

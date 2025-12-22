@@ -1,8 +1,8 @@
 from .application import ASGIAppType, SAMESITE
 from .asgi_types import (
     Scope,
-    ASGIReceiveCallable,
-    ASGISendCallable,
+    Receive,
+    Send,
     WebSocketReceiveMessage,
     Method,
     HttpScope,
@@ -10,7 +10,7 @@ from .asgi_types import (
     WebSocketScope,
     HTTPSendMessage,
     WebSocketSendMessage,
-    ASGISendEvent,
+    Message,
     ASGIReceiveEvent,
     WebSocketSendEvent,
     HTTPResponseStartEvent,
@@ -19,7 +19,7 @@ from .asgi_types import (
     LifeSpanSendMessage,
     LifeSpanReceiveMessage,
     LifespanStartupEvent,
-    LifespanShutdownEvent,
+    LifespanShutdownEvent, ScopeSession,
 )
 from .callable_types import Serializer
 from .composite_types import TypeEncodersMap, ResponseCookies, ResponseHeaders, Scopes
@@ -30,10 +30,10 @@ from .structure_types import RawHeaders, ScopeHeaders, StateType
 __all__ = (
     "AnyIOBackend",
     "ASGIAppType",
-    "ASGIReceiveCallable",
+    "Receive",
     "ASGIReceiveEvent",
-    "ASGISendCallable",
-    "ASGISendEvent",
+    "Send",
+    "Message",
     "Empty",
     "EmptyType",
     "HTTPDisconnectEvent",
@@ -54,6 +54,7 @@ __all__ = (
     "Scope",
     "ScopeHeaders",
     "Scopes",
+    "ScopeSession",
     "Serializer",
     "StateType",
     "TypeEncodersMap",

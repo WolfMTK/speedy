@@ -5,7 +5,7 @@ from speedy.datastructures import URL, Headers, QueryParams, Address, State
 from speedy.exceptions import SessionException, AuthException
 from speedy.protocols.app import ASGIApplication
 from speedy.protocols.connection import UserT, AuthT, StateT, HandlerT
-from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable, ASGIReceiveEvent
+from speedy.types import Scope, Receive, Send, ASGIReceiveEvent
 
 
 async def empty_receive() -> NoReturn:
@@ -24,8 +24,8 @@ class ASGIConnection(Generic[HandlerT, UserT, AuthT, StateT]):
     def __init__(
             self,
             scope: Scope,
-            receive: ASGIReceiveCallable = empty_receive,
-            send: ASGISendCallable = empty_send,
+            receive: Receive = empty_receive,
+            send: Send = empty_send,
     ) -> None:
         self._scope = scope
         self._receive = receive
@@ -42,11 +42,11 @@ class ASGIConnection(Generic[HandlerT, UserT, AuthT, StateT]):
         return self._scope
 
     @property
-    def receive(self) -> ASGIReceiveCallable:
+    def receive(self) -> Receive:
         return self._receive
 
     @property
-    def send(self) -> ASGISendCallable:
+    def send(self) -> Send:
         return self._send
 
     @property

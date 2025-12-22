@@ -10,7 +10,7 @@ from speedy.datastructures import FormMultiDict, Accept
 from speedy.exceptions import RequestException, InternalServerException
 from speedy.handlers.http_handlers.base import HTTPRouteHandler
 from speedy.protocols.connection import UserT, AuthT, StateT
-from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable, Method
+from speedy.types import Scope, Receive, Send, Method
 from speedy.types.asgi_types import HTTPServerPushEvent
 
 SERVER_PUSH_HEADERS = {
@@ -31,8 +31,8 @@ class Request(
     def __init__(
             self,
             scope: Scope,
-            receive: ASGIReceiveCallable = empty_receive,
-            send: ASGISendCallable = empty_send,
+            receive: Receive = empty_receive,
+            send: Send = empty_send,
     ) -> None:
         if scope["type"] != "http":
             raise RequestException(

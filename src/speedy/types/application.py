@@ -3,13 +3,13 @@ from typing import Callable, Awaitable, Literal
 from .asgi_types import (
     Scope,
     LifespanScope,
-    ASGIReceiveCallable,
-    ASGISendCallable,
+    Receive,
+    Send,
     LifeSpanReceiveMessage,
     LifeSpanSendMessage,
 )
 
 ASGIAppType = Callable[[Scope | LifespanScope,
-                        ASGIReceiveCallable | LifeSpanReceiveMessage,
-                        ASGISendCallable | LifeSpanSendMessage], Awaitable[None]]
+                        Receive | LifeSpanReceiveMessage,
+                        Send | LifeSpanSendMessage], Awaitable[None]]
 SAMESITE = Literal["lax", "strict", "none"]

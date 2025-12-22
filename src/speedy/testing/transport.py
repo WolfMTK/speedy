@@ -15,9 +15,9 @@ if TYPE_CHECKING:
 
     from speedy.testing.client import TestClient
     from speedy.types import (
-        ASGIReceiveCallable,
+        Receive,
         ASGIReceiveEvent,
-        ASGISendCallable,
+        Send,
         WebSocketScope,
     )
 
@@ -50,7 +50,7 @@ class TestClientTransport(AsyncBaseTransport, Generic[T]):
         self.root_path = root_path
 
     @staticmethod
-    def create_receive(request: Request, context: SendReceiveContext) -> ASGIReceiveCallable:
+    def create_receive(request: Request, context: SendReceiveContext) -> Receive:
         body_source = cast("bytes | str | GeneratorType", request.read() or b"")
         is_generator = isinstance(body_source, GeneratorType)
         generator = body_source if is_generator else None
@@ -84,7 +84,7 @@ class TestClientTransport(AsyncBaseTransport, Generic[T]):
         return receive
 
     @staticmethod
-    def create_send(request: Request, context: SendReceiveContext) -> ASGISendCallable:
+    def create_send(request: Request, context: SendReceiveContext) -> Send:
         raw_kwargs = context["raw_kwargs"]
         stream = raw_kwargs["stream"]
 

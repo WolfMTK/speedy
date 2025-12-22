@@ -51,9 +51,10 @@ else:
 
 if TYPE_CHECKING:
     from speedy.protocols import ASGIApplication
+    from speedy.types import EmptyType
 
 Method: TypeAlias = Union[Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD", "TRACE", "OPTIONS"], HttpMethod]
-
+ScopeSession: TypeAlias = "EmptyType | dict[str, Any] | None"
 Version = Literal["2.0"] | Literal["3.0"]
 
 
@@ -297,7 +298,7 @@ ASGIReceiveEvent: TypeAlias = Union[
     WebSocketReceiveMessage
 ]
 
-ASGIReceiveCallable: TypeAlias = Callable[[], Awaitable[ASGIReceiveEvent]]
+Receive: TypeAlias = Callable[[], Awaitable[ASGIReceiveEvent]]
 
 HTTPSendMessage: TypeAlias = Union[
     HTTPResponseStartEvent,
@@ -322,9 +323,9 @@ LifeSpanSendMessage: TypeAlias = Union[
     LifespanShutdownFailedEvent
 ]
 
-ASGISendEvent: TypeAlias = Union[
+Message: TypeAlias = Union[
     HTTPSendMessage,
     WebSocketSendMessage
 ]
 
-ASGISendCallable: TypeAlias = Callable[[ASGISendEvent], Awaitable[None]]
+Send: TypeAlias = Callable[[Message], Awaitable[None]]

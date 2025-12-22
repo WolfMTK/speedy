@@ -2,7 +2,7 @@ from typing import Sequence
 
 from speedy.middleware import Middleware
 from speedy.protocols.app import ASGIApplication
-from speedy.types import Scope, ASGIReceiveCallable, ASGISendCallable
+from speedy.types import Scope, Receive, Send
 from speedy.types.application import ASGIAppType
 from speedy.types.asgi_types import LifespanScope, LifeSpanReceiveMessage, LifeSpanSendMessage
 
@@ -15,8 +15,8 @@ class Speedy(ASGIApplication):
     async def __call__(
             self,
             scope: Scope | LifespanScope,
-            receive: ASGIReceiveCallable | LifeSpanReceiveMessage,
-            send: ASGISendCallable | LifeSpanSendMessage
+            receive: Receive | LifeSpanReceiveMessage,
+            send: Send | LifeSpanSendMessage
     ) -> None:
         scope['app'] = self
 
