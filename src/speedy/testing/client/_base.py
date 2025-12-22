@@ -14,6 +14,7 @@ from speedy import ScopeType
 from speedy.connection.base import ASGIConnection
 from speedy.datastructures import MutableHeaders
 from speedy.status_code import HTTP_200_OK
+from speedy.testing.client.sync_client import TesClient
 from speedy.types import HTTPResponseStartEvent, ASGIAppType, HttpScope
 from speedy.utils.scope.state import ScopeState
 
@@ -74,4 +75,16 @@ def _prepare_ws_connect_request(
         cookies=cookies,
         extensions=None if extensions is None else dict(extensions),
         timeout=timeout,
+    )
+
+
+async def _get_session_data(client: TesClient) -> dict[str, Any]:
+    if client._session_backend is None:
+        raise RuntimeError("Session backend not configured")
+
+    return await client._session_backend.load_from_connection(
+        connection=fake_asgi_connection(
+            app=client.app,
+            cookies=dict(client.cookies),
+        ),
     )
