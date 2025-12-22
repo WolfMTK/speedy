@@ -22,6 +22,7 @@ from speedy.utils.scope.state import ScopeState
 
 if TYPE_CHECKING:
     from speedy.testing.client.sync_client import TestClient
+    from speedy.testing.client.async_client import AsyncTestClient
 
 
 def fake_http_send_message(headers: MutableHeaders) -> HTTPResponseStartEvent:
@@ -83,7 +84,7 @@ def _prepare_ws_connect_request(
     )
 
 
-async def _get_session_data(client: TestClient) -> dict[str, Any]:
+async def _get_session_data(client: TestClient | AsyncTestClient) -> dict[str, Any]:
     if client._session_backend is None:
         raise RuntimeError("Session backend not configured")
 
@@ -95,7 +96,10 @@ async def _get_session_data(client: TestClient) -> dict[str, Any]:
     )
 
 
-async def _set_session_data(client: TestClient, data: dict[str, Any]) -> None:
+async def _set_session_data(
+        client: TestClient | AsyncTestClient,
+        data: dict[str, Any],
+) -> None:
     if client._session_backend is None:
         raise RuntimeError("Session backend not configured")
 
