@@ -1,4 +1,7 @@
-from typing import Any, Sequence, Mapping
+from __future__ import annotations
+
+from http.cookiejar import CookieJar
+from typing import Any, Sequence, Mapping, TYPE_CHECKING
 
 import httpx
 from httpx import USE_CLIENT_DEFAULT
@@ -14,9 +17,11 @@ from speedy import ScopeType
 from speedy.connection.base import ASGIConnection
 from speedy.datastructures import MutableHeaders
 from speedy.status_code import HTTP_200_OK
-from speedy.testing.client.sync_client import TesClient
 from speedy.types import HTTPResponseStartEvent, ASGIAppType, HttpScope
 from speedy.utils.scope.state import ScopeState
+
+if TYPE_CHECKING:
+    from speedy.testing.client.sync_client import TestClient
 
 
 def fake_http_send_message(headers: MutableHeaders) -> HTTPResponseStartEvent:
@@ -78,7 +83,7 @@ def _prepare_ws_connect_request(
     )
 
 
-async def _get_session_data(client: TesClient) -> dict[str, Any]:
+async def _get_session_data(client: TestClient) -> dict[str, Any]:
     if client._session_backend is None:
         raise RuntimeError("Session backend not configured")
 
@@ -88,3 +93,25 @@ async def _get_session_data(client: TesClient) -> dict[str, Any]:
             cookies=dict(client.cookies),
         ),
     )
+
+
+async def _set_session_data(client: TestClient, data: dict[str, Any]) -> None:
+    if client._session_backend is None:
+        raise RuntimeError("Session backend not configured")
+
+    mutable_headers = MutableHeaders()
+    connection = fake_asgi_connection(
+        app=client.app,
+        cookies=dict(client.cookies),
+    )
+
+    await client._session_backend.store_in_message(
+        scope_session=data,
+        message=fake_http_send_message(mutable_headers),
+        connection=connection,
+    )
+    response = httpx.Response(HTTP_200_OK, request=httpx.Request("GET", client.base_url), headers=mutable_headers.raw)
+
+    cookies = httpx.Cookies(CookieJar())
+    cookies.extract_cookies(response)
+    client.cookies.update(cookies)
