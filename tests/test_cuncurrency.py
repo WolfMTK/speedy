@@ -80,3 +80,30 @@ def test_set_asyncio_executor_from_running_loop_raises(loop: asyncio.AbstractEve
         loop.run_until_complete(main())
 
     assert get_asyncio_executor() is None
+
+
+def test_trio_uses_limiter(mocker: MockerFixture) -> None:
+    limiter = trio.CapacityLimiter(10)
+    mocker.patch("speedy.concurrency.get_trio_capacity_limiter", return_value=limiter)
+    mock_run_sync = mocker.patch("trio.to_thread.run_sync", new_callable=AsyncMock)
+
+    trio.run(sync_to_thread, func)
+
+    assert mock_run_sync.call_args_list[0].kwargs["limiter"] is limiter
+
+
+def test_set_trio_capacity_limiter_from_async_context_raises() -> None:
+    async def main() -> None:
+        set_trio_capacity_limiter(trio.CapacityLimiter(1))
+
+    with pytest.raises(RuntimeError):
+        trio.run(main)
+
+    assert get_trio_capacity_limiter() is None
+
+
+def test_sync_to_thread_unsupported_lib(mocker: MockerFixture, loop: asyncio.AbstractEventLoop) -> None:
+    mocker.patch("speedy.concurrency.current_async_library", return_value="something")
+
+    with pytest.raises(RuntimeError):
+        loop.run_until_complete(sync_to_thread(func))
