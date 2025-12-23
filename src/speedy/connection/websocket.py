@@ -1,11 +1,17 @@
 from enum import Enum
 from typing import Generic, Any, cast, Literal, AsyncGenerator
 
-from speedy.connection.base import ASGIConnection, empty_receive, empty_send
+from speedy.connection.base import (
+    ASGIConnection,
+    empty_receive,
+    empty_send,
+    UserT,
+    AuthT,
+    StateT,
+)
 from speedy.datastructures import Headers
 from speedy.exceptions import WebSocketException, WebSocketDisconnect
 from speedy.handlers.websocket_handlers.base import WebsocketRouteHandler
-from speedy.protocols.connection import UserT, AuthT, StateT
 from speedy.status_code import WS_1000_NORMAL_CLOSURE
 from speedy.types import (
     Scope,
