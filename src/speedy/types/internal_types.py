@@ -8,6 +8,8 @@ RouteHandlerType: TypeAlias = "HTTPRouteHandler | WebsocketRouteHandler"
 
 RouterHandler: TypeAlias = "RouteHandlerType | Callable[..., Any]"
 
+ControllerRouterHandler: TypeAlias = "RouteHandlerType | Callable[..., Any]"
+
 
 class PathParameterDefinition(NamedTuple):
     """Path parameter tuple."""
