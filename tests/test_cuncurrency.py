@@ -7,15 +7,30 @@ import pytest
 import trio
 from pytest_mock import MockerFixture
 
-from speedy.concurrency import sync_to_thread, get_asyncio_executor, set_asyncio_executor, get_trio_capacity_limiter, \
-    set_trio_capacity_limiter
+from speedy.concurrency import (
+    sync_to_thread,
+    get_asyncio_executor,
+    set_asyncio_executor,
+    get_trio_capacity_limiter,
+    set_trio_capacity_limiter,
+    _State,
+)
+
+
+@pytest.fixture(autouse=True)
+def reset_state() -> Iterator[None]:
+    _State.LIMITER = None
+    _State.EXECUTOR = None
+    yield
+    _State.LIMITER = None
+    _State.EXECUTOR = None
 
 
 def func() -> int:
     return 1
 
 
-@pytest.fixture
+@pytest.fixture()
 def loop() -> Iterator[asyncio.AbstractEventLoop]:
     loop = asyncio.new_event_loop()
     try:
