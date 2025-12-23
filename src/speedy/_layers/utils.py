@@ -14,6 +14,7 @@ def narrow_response_cookies(cookies: ResponseCookies | None) -> Sequence[Cookie]
         return tuple(Cookie(key=key, value=value) for key, value in cookies.items())
     return tuple(cookies)
 
+
 def narrow_response_headers(headers: ResponseHeaders | None) -> Sequence[ResponseHeader]:
     """ Convert response headers into a normalized sequence of ResponseHeader objects. """
     if headers is None:
