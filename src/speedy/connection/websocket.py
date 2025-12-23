@@ -6,7 +6,6 @@ from speedy.datastructures import Headers
 from speedy.exceptions import WebSocketException, WebSocketDisconnect
 from speedy.handlers.websocket_handlers.base import WebsocketRouteHandler
 from speedy.protocols.connection import UserT, AuthT, StateT
-from speedy.serialization.msgspec_hooks import default_serializer
 from speedy.status_code import WS_1000_NORMAL_CLOSURE
 from speedy.types import (
     Scope,
@@ -190,7 +189,7 @@ class WebSocket(Generic[UserT, AuthT, StateT], ASGIConnection[WebsocketRouteHand
     async def send_msgpack(self,
             data: Any,
             encoding: str = "utf-8",
-            serializer: Serializer = default_serializer,
+            serializer: Serializer | None = None,
     ) -> None:
         """ Send data as MessagePack. """
         # TODO: Add encoder for msgpack

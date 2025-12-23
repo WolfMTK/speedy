@@ -1,6 +1,6 @@
 import pytest
 
-from speedy.utils.path import normalize_path
+from speedy.utils import normalize_path
 
 
 @pytest.mark.parametrize(
