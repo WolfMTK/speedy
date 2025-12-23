@@ -20,10 +20,8 @@ def current_async_library() -> str:
         try:
             if check():
                 return lib_name
-        except RuntimeError:
-            continue
-        except ImportError:
-            continue
+        except (RuntimeError, ImportError):
+            pass
     raise AsyncLibraryNotFoundError(
         "unknown async library, or not in async context"
     )
