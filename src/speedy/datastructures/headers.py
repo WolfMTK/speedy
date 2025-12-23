@@ -6,7 +6,7 @@ from typing import Any, ClassVar
 
 from speedy._multipart import parse_content_header
 from speedy.exceptions.http_exceptions import ImproperlyConfiguredException
-from speedy.types import RawHeaders, ScopeHeaders, Scope
+from speedy.types import RawHeaders, Scope
 
 ETAG_RE = re.compile(r"([Ww]/)?\"(.+)\"")
 PRINTABLE_ASCII_RE: re.Pattern[str] = re.compile(r"^[ -~]+$")
@@ -89,10 +89,10 @@ class Headers(Mapping[str, str]):
         return MutableHeaders(raw=self.raw)
 
     def _get_raw(self,
-            headers: Mapping[str, str] | None = None,
-            raw: RawHeaders | None = None,
-            scope: Scope | None = None,
-    ) -> RawHeaders:
+                 headers: Mapping[str, str] | None = None,
+                 raw: RawHeaders | None = None,
+                 scope: Scope | None = None,
+                 ) -> RawHeaders:
         if headers is not None:
             if raw is not None:
                 raise AttributeError("Cannot set both \"headers\" and \"raw\".")
