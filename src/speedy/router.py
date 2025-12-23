@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from typing import Sequence, Mapping, Any
+from typing import Sequence, Mapping, Any, TYPE_CHECKING
 
 from speedy._layers.utils import narrow_response_cookies, narrow_response_headers
-from speedy.connection import Request, WebSocket
 from speedy.datastructures import ETag
 from speedy.exceptions.http_exceptions import ImproperlyConfiguredException
-from speedy.response import Response
 from speedy.types import (
     AfterRequestHookHandler,
     AfterResponseHookHandler,
@@ -29,6 +27,10 @@ from speedy.types import (
 from speedy.utils.path import normalize_path
 from speedy.utils.signature import add_types_to_signature_namespace
 from speedy.utils.sync import ensure_async_callable
+
+if TYPE_CHECKING:
+    from speedy.connection import Request, WebSocket
+    from speedy.response import Response
 
 
 class Router:
