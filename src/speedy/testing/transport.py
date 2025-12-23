@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from io import BytesIO
 from types import GeneratorType
-from typing import TYPE_CHECKING, TypeVar, Generic, TypedDict, Any, cast
+from typing import TYPE_CHECKING, TypeVar, Generic, TypedDict, Any, cast, Union
 from urllib.parse import unquote
 
 from httpx import AsyncBaseTransport, Response, ByteStream, BaseTransport
@@ -13,7 +13,7 @@ from speedy.status_code import HTTP_500_INTERNAL_SERVER_ERROR
 if TYPE_CHECKING:
     from httpx import Request
 
-    from speedy.testing.client import TestClient
+    from speedy.testing.client import TestClient, AsyncTestClient
     from speedy.types import (
         Receive,
         ASGIReceiveEvent,
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
         WebSocketScope,
     )
 
-T = TypeVar("T", bound="TestClient")
+T = TypeVar("T", bound=Union["TestClient | AsyncTestClient"])
 
 
 class ConnectionUpgradeExceptionError(Exception):
