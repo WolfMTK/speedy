@@ -16,3 +16,7 @@ class ValidationException(Exception):
 
 class SerializationException(SpeedyException):
     pass
+
+
+class SpeedyWarning(UserWarning):
+    """ Base class for Speedy warnings. """
