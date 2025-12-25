@@ -22,6 +22,7 @@ from speedy.types import (
     ResponseHeaders,
     TypeEncodersMap,
     AnyIOBackend,
+    LifespanHook,
 )
 
 if TYPE_CHECKING:
@@ -45,6 +46,8 @@ def create_test_client(
         etag: ETag | None = None,
         exception_handlers: ExceptionHandlersMap | None = None,
         middleware: Sequence[Middleware] | None = None,
+        on_startup: Sequence[LifespanHook] | None = None,
+        on_shutdown: Sequence[LifespanHook] | None = None,
         multipart_form_part_limit: int = MULTIPART_FORM_PART_LIMIT,
         opt: Mapping[str, Any] | None = None,
         parameters: ParametersMap | None = None,
@@ -82,6 +85,8 @@ def create_test_client(
         lifespan=lifespan,
         exception_handlers=exception_handlers,
         middleware=middleware,
+        on_startup=on_startup,
+        on_shutdown=on_shutdown,
         multipart_form_part_limit=multipart_form_part_limit,
         opt=opt,
         parameters=parameters,
@@ -126,6 +131,8 @@ def create_async_test_client(
         exception_handlers: ExceptionHandlersMap | None = None,
         middleware: Sequence[Middleware] | None = None,
         multipart_form_part_limit: int = MULTIPART_FORM_PART_LIMIT,
+        on_startup: Sequence[LifespanHook] | None = None,
+        on_shutdown: Sequence[LifespanHook] | None = None,
         opt: Mapping[str, Any] | None = None,
         parameters: ParametersMap | None = None,
         path: str | None = None,
@@ -162,6 +169,8 @@ def create_async_test_client(
         exception_handlers=exception_handlers,
         middleware=middleware,
         multipart_form_part_limit=multipart_form_part_limit,
+        on_startup=on_startup,
+        on_shutdown=on_shutdown,
         opt=opt,
         parameters=parameters,
         path=path,
