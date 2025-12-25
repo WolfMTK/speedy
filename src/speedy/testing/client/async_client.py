@@ -116,4 +116,4 @@ class AsyncTestClient(AsyncClient, Generic[T]):
 
     async def set_session_data(self, data: dict[str, Any]) -> None:
         """ Set session data. """
-        return await _set_session_data(self, data)
+        await _set_session_data(self, data)
