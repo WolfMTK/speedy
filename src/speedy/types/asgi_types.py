@@ -50,7 +50,7 @@ else:
     from typing_extensions import NotRequired
 
 if TYPE_CHECKING:
-    from speedy.protocols import ASGIApplication
+    from speedy import Speedy
     from speedy.types import EmptyType
 
 Method: TypeAlias = Union[Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD", "TRACE", "OPTIONS"], HttpMethod]
@@ -68,7 +68,7 @@ class ASGIVersions(TypedDict):
 class BaseScope(TypedDict):
     """ Base ASGI-scope. """
 
-    app: ASGIApplication  # type: ignore[valid-type]
+    app: Speedy
     asgi: ASGIVersions
     http_version: str
     scheme: str
@@ -329,3 +329,7 @@ Message: TypeAlias = Union[
 ]
 
 Send: TypeAlias = Callable[[Message], Awaitable[None]]
+
+LifeSpanReceive: TypeAlias = Callable[..., Awaitable[LifeSpanReceiveMessage]]
+
+LifeSpanSend: TypeAlias = Callable[[LifeSpanSendMessage], Awaitable[None]]
