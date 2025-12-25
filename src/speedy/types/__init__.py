@@ -26,7 +26,8 @@ from speedy.types.asgi_types import (
     LifespanShutdownCompleteEvent,
     LifespanStartupCompleteEvent,
     LifespanScope,
-    LifespanStartupFailedEvent, LifespanShutdownFailedEvent,
+    LifespanStartupFailedEvent,
+    LifespanShutdownFailedEvent,
 )
 from speedy.types.callable_types import (
     Serializer,
@@ -39,7 +40,9 @@ from speedy.types.callable_types import (
     AfterExceptionHookHandler,
     BeforeMessageSendHookHandler,
     ExceptionLoggingHandler,
-    GetLogger, Lifespan,
+    GetLogger,
+    Lifespan,
+    LifespanHook,
 )
 from speedy.types.composite_types import (
     TypeEncodersMap,
@@ -80,11 +83,12 @@ __all__ = (
     "HTTPResponseStartEvent",
     "HTTPSendMessage",
     "HttpScope",
-    "LifeSpan",
     "LifeSpanReceive",
     "LifeSpanReceiveMessage",
     "LifeSpanSend",
     "LifeSpanSendMessage",
+    "Lifespan",
+    "LifespanHook",
     "LifespanScope",
     "LifespanShutdownCompleteEvent",
     "LifespanShutdownEvent",

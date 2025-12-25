@@ -51,3 +51,5 @@ ExceptionLoggingHandler: TypeAlias = "Callable[[ILogger, Scope, list[str]], None
 GetLogger: TypeAlias = "Callable[..., ILogger]"
 
 Lifespan: TypeAlias = "Sequence[Callable[[Speedy], AbstractAsyncContextManager] | AbstractAsyncContextManager] | None"
+
+LifespanHook: TypeAlias = "Callable[[Speedy], SyncOrAsyncUnion[Any]] | Callable[[], SyncOrAsyncUnion[Any]]"
