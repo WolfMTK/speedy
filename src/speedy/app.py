@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import functools
+import inspect
 import logging
 import os
 from contextlib import asynccontextmanager, AsyncExitStack, AbstractAsyncContextManager
 from typing import Sequence, Mapping, Any, TYPE_CHECKING, AsyncGenerator
 
 from speedy import Router
+from speedy._asgi import ASGIRouter
 from speedy.config import ApplicationConfig, BaseLoggingConfig, LoggingConfig
 from speedy.config.logging import get_logger_placeholder
 from speedy.connection import Request, WebSocket
@@ -37,9 +40,8 @@ from speedy.types import (
     Send,
     Lifespan,
     LifespanHook,
-    LifespanStartupCompleteEvent,
-    LifespanShutdownCompleteEvent,
 )
+from speedy.utils.predicates import is_async_callable
 from speedy.utils.sync import ensure_async_callable
 
 if TYPE_CHECKING:
@@ -162,6 +164,8 @@ class Speedy(Router):
             websocket_class=self.websocket_class,
         )
 
+        self.asgi_router = ASGIRouter(app=self)
+
         if self.logging_config:
             self.get_logger = self.logging_config.configure()
             self.logger = self.get_logger("speedy")
@@ -173,15 +177,7 @@ class Speedy(Router):
             send: Send | LifeSpanSend,
     ) -> None:
         if scope["type"] == "lifespan":
-            startup_event: LifespanStartupCompleteEvent = {"type": "lifespan.startup.complete"}
-            shutdown_event: LifespanShutdownCompleteEvent = {"type": "lifespan.shutdown.complete"}
-
-            await receive()
-            async with self.lifespan():
-                await send(startup_event)
-                await receive()
-
-            await send(shutdown_event)
+            await self.asgi_router.lifespan(receive, send)
 
     @property
     def debug(self) -> bool:
@@ -197,9 +193,20 @@ class Speedy(Router):
     async def lifespan(self) -> AsyncGenerator[None, None]:
         """ Context manager handling the ASGI lifespan. """
         async with AsyncExitStack() as exit_stack:
+            for hook in self.on_shutdown[::-1]:
+                exit_stack.push_async_callback(functools.partial(self._call_lifespan_hook, hook))
+
             for manager in self._lifespan_managers:
                 if not isinstance(manager, AbstractAsyncContextManager):
                     manager = manager(self)
                 await exit_stack.enter_async_context(manager)
 
+            for hook in self.on_startup:
+                await self._call_lifespan_hook(hook)
+
             yield
+
+    async def _call_lifespan_hook(self, hook: LifespanHook) -> None:
+        res = await hook(self) if inspect.signature(hook).parameters else hook()
+        if is_async_callable(hook):
+            await res
