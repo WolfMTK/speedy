@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Sequence, Mapping, Any, TYPE_CHECKING
+from contextlib import asynccontextmanager, AsyncExitStack, AbstractAsyncContextManager
+from typing import Sequence, Mapping, Any, TYPE_CHECKING, AsyncGenerator
 
 from speedy import Router
 from speedy.config import ApplicationConfig, BaseLoggingConfig, LoggingConfig
@@ -174,13 +175,13 @@ class Speedy(Router):
         if scope["type"] == "lifespan":
             startup_event: LifespanStartupCompleteEvent = {"type": "lifespan.startup.complete"}
             shutdown_event: LifespanShutdownCompleteEvent = {"type": "lifespan.shutdown.complete"}
-            while True:
-                message = await receive()
-                if message["type"] == "lifespan.startup":
-                    await send(startup_event)
-                elif message["type"] == "lifespan.shutdown":
-                    await send(shutdown_event)
-                    return
+
+            await receive()
+            async with self.lifespan():
+                await send(startup_event)
+                await receive()
+
+            await send(shutdown_event)
 
     @property
     def debug(self) -> bool:
@@ -191,3 +192,14 @@ class Speedy(Router):
         if self.logger and self.logging_config:
             self.logging_config.set_level(self.logger, logging.DEBUG if value else logging.INFO)
         self._debug = value
+
+    @asynccontextmanager
+    async def lifespan(self) -> AsyncGenerator[None, None]:
+        """ Context manager handling the ASGI lifespan. """
+        async with AsyncExitStack() as exit_stack:
+            for manager in self._lifespan_managers:
+                if not isinstance(manager, AbstractAsyncContextManager):
+                    manager = manager(self)
+                await exit_stack.enter_async_context(manager)
+
+            yield
