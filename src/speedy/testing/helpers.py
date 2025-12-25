@@ -20,7 +20,8 @@ from speedy.types import (
     ParametersMap,
     ResponseCookies,
     ResponseHeaders,
-    TypeEncodersMap, AnyIOBackend,
+    TypeEncodersMap,
+    AnyIOBackend,
 )
 
 if TYPE_CHECKING:

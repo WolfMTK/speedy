@@ -1,11 +1,11 @@
-from .cookie import Cookie
-from .headers import Headers, MutableHeaders, ETag, Header, Accept
-from .multi_dicts import ImmutableMultiDict, MultiDict, FormMultiDict
-from .response_header import ResponseHeader
-from .secrets_values import SecretBytes, SecretString
-from .state import State, ImmutableState
-from .upload_file import UploadFile
-from .url import URL, URLPath, QueryParams, Address
+from speedy.datastructures.cookie import Cookie
+from speedy.datastructures.headers import Headers, MutableHeaders, ETag, Header, Accept
+from speedy.datastructures.multi_dicts import ImmutableMultiDict, MultiDict, FormMultiDict
+from speedy.datastructures.response_header import ResponseHeader
+from speedy.datastructures.secrets_values import SecretBytes, SecretString
+from speedy.datastructures.state import State, ImmutableState
+from speedy.datastructures.upload_file import UploadFile
+from speedy.datastructures.url import URL, URLPath, QueryParams, Address
 
 __all__ = (
     "URL",

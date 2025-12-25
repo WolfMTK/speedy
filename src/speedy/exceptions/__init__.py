@@ -1,10 +1,10 @@
-from .base import (
+from speedy.exceptions.base import (
     ASGIApplicationException,
     ConnectionException,
     ValidationException,
     SpeedyWarning,
 )
-from .connection import (
+from speedy.exceptions.connection import (
     SessionException,
     AuthException,
     RequestException,
