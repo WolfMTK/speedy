@@ -1,0 +1,41 @@
+import decimal
+import pathlib
+import uuid
+import datetime
+
+from speedy.exceptions.http_exceptions import ImproperlyConfiguredException
+
+param_type_map = {
+    "str": str,
+    "int": int,
+    "float": float,
+    "uuid": uuid.UUID,
+    "decimal": decimal.Decimal,
+    "date": datetime.date,
+    "datetime": datetime.datetime,
+    "time": datetime.time,
+    "timedelta": datetime.timedelta,
+    "path": pathlib.Path,
+}
+
+
+def _validate_path_parameter(param: str, path: str) -> None:
+    name, sep, ptype = param.partition(":")
+    name = name.strip()
+    ptype = ptype.strip()
+    if not sep:
+        raise ImproperlyConfiguredException(
+            "Path parameters should be declared with a type "
+            f"using the following pattern: '{{parameter_name:type}}', "
+            f"e.g. '/my-path/{{my_param:int}}' in path: '{path}'",
+        )
+    if not name:
+        raise ImproperlyConfiguredException(
+            "Path parameter names "
+            "should be of length greater than zero",
+        )
+    if ptype not in param_type_map:
+        raise ImproperlyConfiguredException(
+            "Path parameters should be declared with an allowed type, "
+            f"i.e. one of {', '.join(param_type_map.keys())} in path: '{path}'",
+        )
