@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field, asdict
 from typing import Any
 
-from speedy import MediaType
+from speedy.enums import MediaType
 from speedy.connection import Request
 from speedy.exceptions import HTTPException
 from speedy.exceptions.base import SpeedyException
@@ -23,7 +23,7 @@ class ExceptionResponseContent:
 
     def to_response(self, request: Request | None = None) -> Response:
         """ Create a response from the model attributes. """
-        content = {key: val for key, val in asdict(self).items() if key not in ("headers",) and val is not None}
+        content = {key: val for key, val in asdict(self).items() if key not in ("headers", "media_type") and val is not None}
         type_encoders = base._get_type_encoders_for_request(request) if request is not None else None
         if self.media_type != MediaType.JSON:
             content = encode_json(content, get_serializer())

@@ -6,7 +6,8 @@ from collections.abc import Iterable, Mapping
 from datetime import datetime
 from typing import TypeVar, Any, ClassVar, Generic, overload
 
-from speedy import BackgroundTask, BackgroundTasks, MediaType
+from speedy.background import BackgroundTask, BackgroundTasks
+from speedy.enums import MediaType
 from speedy.connection.request import Request
 from speedy.datastructures import MutableHeaders, Cookie, ETag
 from speedy.exceptions.http_exceptions import ImproperlyConfiguredException
