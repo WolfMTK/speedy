@@ -12,7 +12,7 @@ from speedy.exceptions.connection import (
     WebSocketException,
     WebSocketDisconnect
 )
-
+from speedy.exceptions.http_exceptions import HTTPException
 __all__ = (
     "ASGIApplicationException",
     "AuthException",
@@ -23,5 +23,8 @@ __all__ = (
     "SpeedyWarning",
     "ValidationException",
     "WebSocketDisconnect",
-    "WebSocketException"
+    "WebSocketException",
+    "HTTPException",
 )
+
+
