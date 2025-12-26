@@ -51,14 +51,14 @@ else:
 
 if TYPE_CHECKING:
     from speedy import Speedy
-    from speedy.types import EmptyType
+    from speedy.types import EmptyType, RouteHandlerType
 
 Method: TypeAlias = Union[Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD", "TRACE", "OPTIONS"], HttpMethod]
 ScopeSession: TypeAlias = "EmptyType | dict[str, Any] | None"
 Version = Literal["2.0"] | Literal["3.0"]
 
 
-class ASGIVersions(TypedDict):
+class ASGIVersion(TypedDict):
     """ ASGI spec version. """
 
     spec_version: str
@@ -69,7 +69,7 @@ class BaseScope(TypedDict):
     """ Base ASGI-scope. """
 
     app: Speedy
-    asgi: ASGIVersions
+    asgi: ASGIVersion
     http_version: str
     scheme: str
     path: str
@@ -82,9 +82,10 @@ class BaseScope(TypedDict):
     server: tuple[str, int | None] | None
     state: NotRequired[dict[str, Any]]
     extensions: NotRequired[dict[str, dict[object, object]]]
+    route_handler: RouteHandlerType
 
 
-class HttpScope(BaseScope):
+class HTTPScope(BaseScope):
     """ HTTP-ASGI-scope. """
 
     type: Literal[ScopeType.HTTP]
@@ -103,7 +104,7 @@ class LifespanScope(TypedDict):
 
     app: ASGIApplication  # type: ignore[valid-type]
     type: Literal[ScopeType.LIFESPAN]
-    asgi: ASGIVersions
+    asgi: ASGIVersion
     state: NotRequired[dict[str, Any]]
 
 
@@ -291,7 +292,7 @@ LifeSpanReceiveMessage: TypeAlias = Union[
     LifespanShutdownEvent
 ]
 
-Scope: TypeAlias = Union[HttpScope, WebSocketScope]
+Scope: TypeAlias = Union[HTTPScope, WebSocketScope]
 
 ASGIReceiveEvent: TypeAlias = Union[
     HTTPReceiveMessage,

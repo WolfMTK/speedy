@@ -1,8 +1,16 @@
-from collections.abc import Sequence
-from typing import Any
+from __future__ import annotations
 
-from speedy.types.callable_types import AsyncAnyCallable
-from speedy.types.composite_types import TypeDecodersSequence, TypeEncodersMap
+from collections.abc import Sequence
+from typing import Any, Mapping
+
+from speedy.types import (
+    AsyncAnyCallable,
+    TypeDecodersSequence,
+    TypeEncodersMap,
+    ExceptionHandlersMap,
+    Middleware,
+    ParametersMap,
+)
 from speedy.utils.path import normalize_path
 
 
@@ -12,11 +20,18 @@ class BaseRouteHandler:
             path: str | Sequence[str] | None = None,
             *,
             fn: AsyncAnyCallable,
+            exception_handlers: ExceptionHandlersMap | None = None,
+            middleware: Sequence[Middleware] | None = None,
             name: str | None = None,
+            opt: Mapping[str, Any] | None = None,
+            signature_namespace: Mapping[str, Any] | None = None,
+            signature_types: Sequence[Any] | None = None,
+            parameters: ParametersMap | None = None,
             type_decoders: TypeDecodersSequence | None = None,
             type_encoders: TypeEncodersMap | None = None,
             **kwargs: Any,
     ) -> None:
+        self.exception_handlers = exception_handlers or {}
         self.name = name
         self.paths = self._get_paths(path)
         self.fn = fn

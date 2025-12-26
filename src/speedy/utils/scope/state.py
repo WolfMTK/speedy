@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Self
 
-from speedy.types import EmptyType
+from speedy.types import EmptyType, ExceptionHandlersMap, Empty
 
 if TYPE_CHECKING:
     from speedy.datastructures import Accept, URL, UploadFile, Headers
@@ -16,9 +16,6 @@ CONNECTION_STATE = "_ls_connection_state"
 class ScopeState:
     """ An object for storing connection state."""
 
-    def __init__(self) -> None:
-        ...
-
     accept: Accept | EmptyType
     base_url: URL | EmptyType
     body: bytes | EmptyType
@@ -27,12 +24,32 @@ class ScopeState:
     form: dict[str, str | list[str] | UploadFile] | EmptyType
     headers: Headers | EmptyType
     is_cached: bool | EmptyType
+    json: Any | EmptyType
     msgpack: Any | EmptyType
     parsed_query: tuple[tuple[str, str], ...] | EmptyType
     response_compressed: bool | EmptyType
     response_started: bool
     session_id: str | None | EmptyType
     url: URL | EmptyType
+    exception_handlers: ExceptionHandlersMap | EmptyType
+
+    def __init__(self) -> None:
+        self.accept = Empty
+        self.base_url = Empty
+        self.body = Empty
+        self.content_type = Empty
+        self.cookies = Empty
+        self.exception_handlers = Empty
+        self.form = Empty
+        self.headers = Empty
+        self.is_cached = Empty
+        self.json = Empty
+        self.msgpack = Empty
+        self.parsed_query = Empty
+        self.response_compressed = Empty
+        self.response_started = False
+        self.session_id = Empty
+        self.url = Empty
 
     @classmethod
     def from_scope(cls, scope: Scope) -> Self:

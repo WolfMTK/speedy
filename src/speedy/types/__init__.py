@@ -5,7 +5,7 @@ from speedy.types.asgi_types import (
     Send,
     WebSocketReceiveMessage,
     Method,
-    HttpScope,
+    HTTPScope,
     HTTPReceiveMessage,
     WebSocketScope,
     HTTPSendMessage,
@@ -27,7 +27,7 @@ from speedy.types.asgi_types import (
     LifespanStartupCompleteEvent,
     LifespanScope,
     LifespanStartupFailedEvent,
-    LifespanShutdownFailedEvent,
+    LifespanShutdownFailedEvent, ASGIVersion,
 )
 from speedy.types.callable_types import (
     Serializer,
@@ -42,7 +42,7 @@ from speedy.types.callable_types import (
     ExceptionLoggingHandler,
     GetLogger,
     Lifespan,
-    LifespanHook,
+    LifespanHook, HTTPHandlerDecorator, AnyCallable, AsyncAnyCallable,
 )
 from speedy.types.composite_types import (
     TypeEncodersMap,
@@ -56,7 +56,7 @@ from speedy.types.composite_types import (
 )
 from speedy.types.empty import Empty, EmptyType
 from speedy.types.helper_types import AnyIOBackend
-from speedy.types.internal_types import ControllerRouterHandler
+from speedy.types.internal_types import ControllerRouterHandler, RouteHandlerType
 from speedy.types.structure_types import RawHeaders, ScopeHeaders, StateType
 
 __all__ = (
@@ -64,10 +64,13 @@ __all__ = (
     "AfterRequestHookHandler",
     "AfterResponseHookHandler",
     "AnyIOBackend",
+    "AnyCallable",
     "ASGIAppType",
     "ASGIReceiveEvent",
+    "ASGIVersion",
     "AsyncAfterRequestHookHandler",
     "AsyncAfterResponseHookHandler",
+    "AsyncAnyCallable",
     "AsyncBeforeRequestHookHandler",
     "BeforeMessageSendHookHandler",
     "BeforeRequestHookHandler",
@@ -78,11 +81,12 @@ __all__ = (
     "ExceptionLoggingHandler",
     "GetLogger",
     "HTTPDisconnectEvent",
+    "HTTPHandlerDecorator",
     "HTTPReceiveMessage",
     "HTTPRequestEvent",
     "HTTPResponseStartEvent",
+    "HTTPScope",
     "HTTPSendMessage",
-    "HttpScope",
     "LifeSpanReceive",
     "LifeSpanReceiveMessage",
     "LifeSpanSend",
@@ -104,6 +108,7 @@ __all__ = (
     "Receive",
     "ResponseCookies",
     "ResponseHeaders",
+    "RouteHandlerType",
     "SAMESITE",
     "Scope",
     "ScopeHeaders",

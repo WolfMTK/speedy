@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from speedy.types import Scope, Message
     from speedy.protocols import ILogger
     from speedy.types.helper_types import SyncOrAsyncUnion
+    from speedy.handlers.http_handlers.base import HTTPRouteHandler
 
 AfterExceptionHookHandler: TypeAlias = "Callable[[ExceptionT, Scope], SyncOrAsyncUnion[None]]"
 
@@ -53,3 +54,7 @@ GetLogger: TypeAlias = "Callable[..., ILogger]"
 Lifespan: TypeAlias = "Sequence[Callable[[Speedy], AbstractAsyncContextManager] | AbstractAsyncContextManager] | None"
 
 LifespanHook: TypeAlias = "Callable[[Speedy], SyncOrAsyncUnion[Any]] | Callable[[], SyncOrAsyncUnion[Any]]"
+
+AnyCallable: TypeAlias = Callable[..., Any]
+
+HTTPHandlerDecorator: TypeAlias = "Callable[..., Callable[[AnyCallable], HTTPRouteHandler]]"

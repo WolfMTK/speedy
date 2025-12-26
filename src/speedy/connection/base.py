@@ -1,10 +1,16 @@
-from typing import Generic, NoReturn, Any, cast, TypeVar
+from __future__ import annotations
+
+from typing import Generic, NoReturn, Any, cast, TypeVar, TYPE_CHECKING
 
 from speedy._parsers import parse_cookie_string
 from speedy.datastructures import URL, Headers, QueryParams, Address, State
 from speedy.exceptions import SessionException, AuthException
 from speedy.protocols.app import ASGIApplication
 from speedy.types import Scope, Receive, Send, ASGIReceiveEvent
+
+if TYPE_CHECKING:
+    from speedy import Speedy
+
 
 UserT = TypeVar("UserT")
 AuthT = TypeVar("AuthT")
@@ -54,7 +60,7 @@ class ASGIConnection(Generic[HandlerT, UserT, AuthT, StateT]):
         return self._send
 
     @property
-    def app(self) -> ASGIApplication:
+    def app(self) -> Speedy:
         """ Return the ASGI application. """
         return self.scope["app"]
 
