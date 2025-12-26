@@ -3,7 +3,6 @@ from typing import Any
 
 from speedy.exceptions.base import SpeedyException
 from speedy.status_code import HTTP_500_INTERNAL_SERVER_ERROR
-from speedy.types import Empty, EmptyType
 
 
 class HTTPException(SpeedyException):
