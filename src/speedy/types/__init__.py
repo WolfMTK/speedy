@@ -56,15 +56,15 @@ from speedy.types.composite_types import (
 )
 from speedy.types.empty import Empty, EmptyType
 from speedy.types.helper_types import AnyIOBackend
-from speedy.types.internal_types import ControllerRouterHandler, RouteHandlerType
+from speedy.types.internal_types import ControllerRouterHandler, RouteHandlerType, PathParameterDefinition
 from speedy.types.structure_types import RawHeaders, ScopeHeaders, StateType
 
 __all__ = (
     "AfterExceptionHookHandler",
     "AfterRequestHookHandler",
     "AfterResponseHookHandler",
-    "AnyIOBackend",
     "AnyCallable",
+    "AnyIOBackend",
     "ASGIAppType",
     "ASGIReceiveEvent",
     "ASGIVersion",
@@ -104,6 +104,7 @@ __all__ = (
     "Method",
     "Middleware",
     "ParametersMap",
+    "PathParameterDefinition",
     "RawHeaders",
     "Receive",
     "ResponseCookies",
