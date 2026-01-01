@@ -1,7 +1,7 @@
+import datetime
 import decimal
 import pathlib
 import uuid
-import datetime
 
 from speedy.exceptions.http_exceptions import ImproperlyConfiguredException
 
@@ -17,6 +17,40 @@ param_type_map = {
     "timedelta": datetime.timedelta,
     "path": pathlib.Path,
 }
+
+
+def _parse_datetime(value: str) -> datetime.datetime:
+    if value.endswith("Z"):
+        value = value[:-1] + "+00:00"
+    return datetime.datetime.fromisoformat(value)
+
+
+def _parse_date(value: str) -> datetime.date:
+    return datetime.date.fromisoformat(value)
+
+
+def _parse_time(value: str) -> datetime.time:
+    return datetime.time.fromisoformat(value)
+
+
+def _parse_timedelta(value: str) -> datetime.timedelta:
+    try:
+        return datetime.timedelta(seconds=float(value))
+    except ValueError:
+        pass
+
+    try:
+        val = datetime.time.fromisoformat(value)
+        return datetime.timedelta(
+            hours=val.hour,
+            minutes=val.minute,
+            seconds=val.second,
+            microseconds=val.microsecond,
+        )
+    except ValueError:
+        pass
+
+    raise ValueError(f"Invalid timedelta format: `{value}`")
 
 
 def _validate_path_parameter(param: str, path: str) -> None:
