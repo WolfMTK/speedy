@@ -27,7 +27,9 @@ from speedy.types.asgi_types import (
     LifespanStartupCompleteEvent,
     LifespanScope,
     LifespanStartupFailedEvent,
-    LifespanShutdownFailedEvent, ASGIVersion,
+    LifespanShutdownFailedEvent,
+    ASGIVersion,
+    BaseScope,
 )
 from speedy.types.callable_types import (
     Serializer,
@@ -42,7 +44,10 @@ from speedy.types.callable_types import (
     ExceptionLoggingHandler,
     GetLogger,
     Lifespan,
-    LifespanHook, HTTPHandlerDecorator, AnyCallable, AsyncAnyCallable,
+    LifespanHook,
+    HTTPHandlerDecorator,
+    AnyCallable,
+    AsyncAnyCallable,
 )
 from speedy.types.composite_types import (
     TypeEncodersMap,
@@ -56,7 +61,11 @@ from speedy.types.composite_types import (
 )
 from speedy.types.empty import Empty, EmptyType
 from speedy.types.helper_types import AnyIOBackend
-from speedy.types.internal_types import ControllerRouterHandler, RouteHandlerType, PathParameterDefinition
+from speedy.types.internal_types import (
+    ControllerRouterHandler,
+    RouteHandlerType,
+    PathParameterDefinition,
+)
 from speedy.types.structure_types import RawHeaders, ScopeHeaders, StateType
 
 __all__ = (
@@ -72,6 +81,7 @@ __all__ = (
     "AsyncAfterResponseHookHandler",
     "AsyncAnyCallable",
     "AsyncBeforeRequestHookHandler",
+    "BaseScope",
     "BeforeMessageSendHookHandler",
     "BeforeRequestHookHandler",
     "ControllerRouterHandler",
