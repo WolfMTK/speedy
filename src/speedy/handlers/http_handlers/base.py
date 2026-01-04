@@ -1,7 +1,8 @@
-from typing import Sequence, Mapping, Any
+from __future__ import annotations
 
-from speedy import BackgroundTask, BackgroundTasks, MediaType
-from speedy.connection import Request
+from typing import Sequence, Mapping, Any, TYPE_CHECKING
+
+
 from speedy.datastructures import ETag
 from speedy.exceptions.http_exceptions import ImproperlyConfiguredException
 from speedy.handlers.base import BaseRouteHandler
@@ -20,6 +21,10 @@ from speedy.types import (
     TypeEncodersMap,
     ParametersMap,
 )
+
+if TYPE_CHECKING:
+    from speedy import BackgroundTask, BackgroundTasks, MediaType
+    from speedy.connection import Request
 
 
 class HTTPRouteHandler(BaseRouteHandler):
@@ -68,5 +73,5 @@ class HTTPRouteHandler(BaseRouteHandler):
             parameters=parameters,
             type_decoders=type_decoders,
             type_encoders=type_encoders,
-            **kwargs
+            **kwargs,
         )

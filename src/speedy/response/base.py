@@ -4,11 +4,11 @@ import itertools
 import re
 from collections.abc import Iterable, Mapping
 from datetime import datetime
-from typing import TypeVar, Any, ClassVar, Generic, overload
+from typing import TypeVar, Any, ClassVar, Generic, overload, TYPE_CHECKING
 
 from speedy.background import BackgroundTask, BackgroundTasks
 from speedy.enums import MediaType
-from speedy.connection.request import Request
+
 from speedy.datastructures import MutableHeaders, Cookie, ETag
 from speedy.exceptions.http_exceptions import ImproperlyConfiguredException
 from speedy.serialization import encode_json, encode_msgpack
@@ -26,6 +26,9 @@ from speedy.types import (
 from speedy.types.asgi_types import HTTPResponseStartEvent, HTTPResponseBodyEvent
 from speedy.types.composite_types import ResponseCookies, TypeEncodersMap
 from speedy.utils.helpers import get_enum_string_value
+
+if TYPE_CHECKING:
+    from speedy.connection.request import Request
 
 T = TypeVar('T')
 

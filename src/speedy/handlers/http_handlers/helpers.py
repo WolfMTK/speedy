@@ -1,6 +1,6 @@
 from typing import Sequence
 
-from speedy import HttpMethod
+from speedy.enums import HttpMethod
 from speedy.exceptions import ValidationException
 from speedy.types import Method, HttpMethodName
 
