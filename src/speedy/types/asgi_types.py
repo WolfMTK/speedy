@@ -53,7 +53,8 @@ if TYPE_CHECKING:
     from speedy import Speedy
     from speedy.types import EmptyType, RouteHandlerType
 
-Method: TypeAlias = Union[Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD", "TRACE", "OPTIONS"], HttpMethod]
+HttpMethodName: TypeAlias = Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD", "TRACE", "OPTIONS"]
+Method: TypeAlias = Union[HttpMethodName, HttpMethod]
 ScopeSession: TypeAlias = "EmptyType | dict[str, Any] | None"
 Version = Literal["2.0"] | Literal["3.0"]
 

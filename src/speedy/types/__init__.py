@@ -30,6 +30,7 @@ from speedy.types.asgi_types import (
     LifespanShutdownFailedEvent,
     ASGIVersion,
     BaseScope,
+    HttpMethodName,
 )
 from speedy.types.callable_types import (
     Serializer,
@@ -95,6 +96,7 @@ __all__ = (
     "HTTPReceiveMessage",
     "HTTPRequestEvent",
     "HTTPResponseStartEvent",
+    "HttpMethodName",
     "HTTPScope",
     "HTTPSendMessage",
     "LifeSpanReceive",
