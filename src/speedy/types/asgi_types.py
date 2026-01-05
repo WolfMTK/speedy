@@ -90,7 +90,7 @@ class HTTPScope(BaseScope):
     """ HTTP-ASGI-scope. """
 
     type: Literal[ScopeType.HTTP]
-    method: Method
+    method: HttpMethodName
 
 
 class WebSocketScope(BaseScope):
