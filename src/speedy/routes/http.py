@@ -37,7 +37,7 @@ class HTTPRoute(BaseRoute[HTTPScope]):
         """ Create a mapping of HTTP method names to route handlers. """
         method_handler_pairs = itertools.chain.from_iterable(
             ((http_method, handler) for http_method in handler.http_methods)
-            for handler in route_handlers,
+            for handler in route_handlers
         )
         handler_map = {}
         for http_method, handler in method_handler_pairs:
