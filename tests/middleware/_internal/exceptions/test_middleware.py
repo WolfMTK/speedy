@@ -1,17 +1,14 @@
 from http import HTTPStatus
 from typing import Any, Callable
-from unittest.mock import MagicMock
 
 import pytest
 
 from speedy import Speedy
 from speedy.connection import Request
 from speedy.exceptions import HTTPException
-from speedy.exceptions.base import SpeedyException
 from speedy.middleware._internal.exceptions.middleware import ExceptionHandlerMiddleware
-from speedy.status_code import HTTP_500_INTERNAL_SERVER_ERROR, HTTP_200_OK
-from speedy.types import HTTPScope, HTTPReceiveMessage, Message, Scope, Receive, Send
-from speedy.utils.scope.state import ScopeState
+from speedy.status_code import HTTP_500_INTERNAL_SERVER_ERROR
+from speedy.types import HTTPScope
 
 
 async def dummy_app(scope: Any, receive: Any, send: Any) -> None:
@@ -74,7 +71,7 @@ def test_default_handle_http_exception_extra_list(
         Request(scope=scope),
         HTTPException(
             detail="exception",
-            extra=["key-1", "key-2"]
+            extra=["key-1", "key-2"],
         ),
     )
     exc_status_code = HTTP_500_INTERNAL_SERVER_ERROR
