@@ -1,20 +1,27 @@
 from __future__ import annotations
 
+import collections
 import functools
 import inspect
 import logging
 import os
 from contextlib import asynccontextmanager, AsyncExitStack, AbstractAsyncContextManager
-from typing import Sequence, Mapping, Any, TYPE_CHECKING, AsyncGenerator
+from typing import Sequence, Mapping, Any, TYPE_CHECKING, AsyncGenerator, Iterable
 
 from speedy import Router
-from speedy._asgi import ASGIRouter
+from speedy._asgi import ASGIRouter, wrap_in_exception_handler
 from speedy.config import ApplicationConfig, BaseLoggingConfig, LoggingConfig
 from speedy.config.logging import get_logger_placeholder
 from speedy.connection import Request, WebSocket
 from speedy.constants import MULTIPART_FORM_PART_LIMIT, REQUEST_MAX_BODY_SIZE
 from speedy.datastructures import ETag, State
+from speedy.exceptions.http_exceptions import ImproperlyConfiguredException
+from speedy.handlers import ASGIRouteHandler
+from speedy.handlers.base import BaseRouteHandler
+from speedy.handlers.http_handlers.base import HTTPRouteHandler
+from speedy.handlers.websocket_handlers.base import WebsocketRouteHandler
 from speedy.protocols import ILogger
+from speedy.routes import HTTPRoute, ASGIRoute, WebSocketRoute
 from speedy.types import (
     ControllerRouterHandler,
     AfterExceptionHookHandler,
@@ -40,6 +47,9 @@ from speedy.types import (
     Send,
     Lifespan,
     LifespanHook,
+    ASGIAppType,
+    Message,
+    RouteHandlerType,
 )
 from speedy.utils.predicates import is_async_callable
 from speedy.utils.sync import ensure_async_callable
@@ -166,9 +176,19 @@ class Speedy(Router):
 
         self.asgi_router = ASGIRouter(app=self)
 
+        self.routes = self._build_routes(
+            self._reduce_handlers(self.route_handlers),
+        )
+
+        self.route_handlers = ()
+
+        self.asgi_router.construct_routing_trie()
+
         if self.logging_config:
             self.get_logger = self.logging_config.configure()
             self.logger = self.get_logger("speedy")
+
+        self.asgi_handler = self._create_asgi_handler()
 
     async def __call__(
             self,
@@ -178,6 +198,11 @@ class Speedy(Router):
     ) -> None:
         if scope["type"] == "lifespan":
             await self.asgi_router.lifespan(receive, send)
+            return
+
+        scope["app"] = self
+        scope.setdefault("state", {})
+        await self.asgi_handler(scope, receive, self._wrap_send(send=send, scope=scope))
 
     @property
     def debug(self) -> bool:
@@ -210,3 +235,68 @@ class Speedy(Router):
         res = await hook(self) if inspect.signature(hook).parameters else hook()
         if is_async_callable(hook):
             await res
+
+    def _create_asgi_handler(self) -> ASGIAppType:
+        asgi_handler = wrap_in_exception_handler(app=self.asgi_router)
+
+        return asgi_handler
+
+    def _wrap_send(self, send: Send, scope: Scope) -> Send:
+        if self.before_send:
+
+            async def wrapped_send(message: Message) -> None:
+                for hook in self.before_send:
+                    await hook(message, scope)
+                await send(message)
+
+            return wrapped_send
+        return send
+
+    def _build_routes(
+            self,
+            route_handlers: Iterable[BaseRouteHandler],
+    ) -> list[HTTPRoute | ASGIRoute | WebSocketRoute]:
+        routes = []
+        http_path_groups = collections.defaultdict(list)
+
+        for handler in route_handlers:
+            if isinstance(handler, HTTPRouteHandler):
+                for path in handler.paths:
+                    http_path_groups[path].append(handler)
+            elif isinstance(handler, ASGIRouteHandler):
+                for path in handler.paths:
+                    routes.append(ASGIRoute(path=path, route_handler=handler))
+
+        return routes
+
+    def _reduce_handlers(self, handlers: Iterable[ControllerRouterHandler]) -> Iterable[BaseRouteHandler]:
+        for handler, bases in self._iter_handlers(handlers, bases=[self]):
+            yield handler.merge(*bases)
+
+    def _iter_handlers(
+            self,
+            handlers: Iterable[ControllerRouterHandler],
+            bases: list[Router],
+    ) -> Iterable[tuple[BaseRouteHandler, list[Router]]]:
+        for handler in handlers:
+            handler = self._validate_registration_value(handler)
+            if isinstance(handler, Router):
+                yield from self._iter_handlers(handler.route_handlers, bases=[handler, *bases])
+            else:
+                yield handler, bases
+
+    def _validate_registration_value(self, value: ControllerRouterHandler) -> RouteHandlerType | Router:
+        if isinstance(value, Router):
+            if value in self:
+                raise ImproperlyConfiguredException("Cannot register a router on itself")
+
+            return value
+
+        if isinstance(value, (ASGIRouteHandler, HTTPRouteHandler, WebsocketRouteHandler)):
+            return value
+
+        raise ImproperlyConfiguredException(
+            "Unsupported value passed to `Router.register`. "
+            "If you passed in a function or method, "
+            "make sure to decorate it first with one of the routing decorators",
+        )
