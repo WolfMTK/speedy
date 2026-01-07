@@ -18,7 +18,7 @@ from speedy.connection.base import ASGIConnection
 from speedy.datastructures import MutableHeaders
 from speedy.status_code import HTTP_200_OK
 from speedy.types import HTTPResponseStartEvent, ASGIAppType, HTTPScope
-from speedy.utils.scope.state import ScopeState
+from speedy.utils.scope import ScopeState
 
 if TYPE_CHECKING:
     from speedy.testing.client.sync_client import TestClient

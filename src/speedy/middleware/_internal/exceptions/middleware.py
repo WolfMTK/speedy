@@ -4,7 +4,7 @@ from speedy.connection import Request
 from speedy.exceptions.responses import create_exception_response
 from speedy.response import Response
 from speedy.types import ASGIAppType, Scope, Receive, Send, Message
-from speedy.utils.scope.state import ScopeState
+from speedy.utils.scope import ScopeState
 
 
 class ExceptionHandlerMiddleware:
