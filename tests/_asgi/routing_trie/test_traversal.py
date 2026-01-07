@@ -83,7 +83,7 @@ def test_parse_path_params_mismatched_length() -> None:
     assert "b" not in result
 
 
-def test_parse_path_params_complex_types():
+def test_parse_path_params_complex_types() -> None:
     uid_str = str(uuid.uuid4())
     params = (
         PathParameterDefinition("uid", "uid:uuid", uuid.UUID, uuid.UUID),
@@ -100,7 +100,7 @@ def test_parse_path_params_complex_types():
     assert result["decimal"] == decimal.Decimal("10.55")
 
 
-def test_parse_path_params_caching():
+def test_parse_path_params_caching() -> None:
     params = (PathParameterDefinition("id", "id:int", int, int),)
     values = ("42",)
 
