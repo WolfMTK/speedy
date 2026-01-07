@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import collections
 import re
+from functools import lru_cache
 from traceback import format_exc
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from speedy._asgi.routing_trie import RouteTrieNode, create_node, validate_node
+from speedy._asgi.routing_trie import (
+    RouteTrieNode,
+    create_node,
+    validate_node,
+    parse_path_to_route,
+)
 from speedy.routes import HTTPRoute, WebSocketRoute, ASGIRoute
 from speedy.routes.base import BaseRoute
 from speedy.types import (
@@ -19,7 +25,12 @@ from speedy.types import (
     Receive,
     Send,
     ExceptionHandlersMap,
+    Method,
+    ASGIAppType,
+    RouteHandlerType,
 )
+from speedy.utils import normalize_path
+from speedy.utils.scope import ScopeState
 
 if TYPE_CHECKING:
     from speedy import Speedy
@@ -39,6 +50,44 @@ class ASGIRouter:
         self.root_route_map_node: RouteTrieNode = create_node()
         self.route_handler_index: dict[str, RouteTrieNode] = {}
         self.route_mapping: dict[str, list[BaseRoute]] = collections.defaultdict(list)
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        scope.setdefault("path_params", {})
+
+        path = scope["path"]
+        if root_path := scope.get("root_path", ""):
+            path = path.split(root_path, maxsplit=1)[-1]
+        normalized_path = normalize_path(path)
+
+        try:
+            asgi_app, route_handler, scope["path"], scope["path_params"], path_template = self.handle_routing(
+                path=normalized_path,
+                method=scope.get("method"),
+            )
+        except Exception:
+            ScopeState.from_scope(scope).exception_handlers = self._app_exception_handlers
+            raise
+        else:
+            ScopeState.from_scope(scope).exception_handlers = route_handler.exception_handlers
+            scope["route_handler"] = route_handler
+            scope["path_template"] = path_template
+
+        await asgi_app(scope, receive, send)
+
+    @lru_cache(1024)
+    def handle_routing(
+            self,
+            path: str,
+            method: Method | None,
+    ) -> tuple[ASGIAppType, RouteHandlerType, str, dict[str, Any], str]:
+        return parse_path_to_route(
+            mount_paths_regex=self._mount_paths_regex,
+            mount_routes=self._mount_routes,
+            path=path,
+            plain_routes=self._plain_routes,
+            root_node=self.root_route_map_node,
+            method=method,
+        )
 
     async def lifespan(self, receive: LifeSpanReceive, send: LifeSpanSend) -> None:
         """ Handle the ASGI `lifespan` event on application startup and shutdown. """
