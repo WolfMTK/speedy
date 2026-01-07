@@ -133,5 +133,5 @@ def _is_sub_route_match(
     return any(
         remaining_path.startswith(f"{sub_route}/")
         for sub_route in mount_node.children
-        if sub_route != mount_path and isinstance(sub_route, str),
+        if sub_route != mount_path and isinstance(sub_route, str)
     )
