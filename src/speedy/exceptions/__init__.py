@@ -1,18 +1,23 @@
 from speedy.exceptions.base import (
     ASGIApplicationException,
     ConnectionException,
-    ValidationException,
     SpeedyWarning,
+    ValidationException,
 )
 from speedy.exceptions.connection import (
-    SessionException,
     AuthException,
-    RequestException,
     InternalServerException,
-    WebSocketException,
+    RequestException,
+    SessionException,
     WebSocketDisconnect,
+    WebSocketException,
 )
-from speedy.exceptions.http_exceptions import HTTPException, NotFoundException, MethodNotAllowedException
+from speedy.exceptions.http_exceptions import (
+    HTTPException,
+    ImproperlyConfiguredException,
+    MethodNotAllowedException,
+    NotFoundException,
+)
 
 __all__ = (
     "ASGIApplicationException",
@@ -28,4 +33,5 @@ __all__ = (
     "ValidationException",
     "WebSocketDisconnect",
     "WebSocketException",
+    "ImproperlyConfiguredException",
 )
