@@ -6,7 +6,7 @@ from speedy.exceptions.http_exceptions import ImproperlyConfiguredException
 from speedy.types import Scopes
 
 
-@dataclass
+@dataclass(slots=True)
 class AllowedHostsConfig:
     """Configuration for allowed hosts protection."""
 
