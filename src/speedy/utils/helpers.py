@@ -3,7 +3,8 @@ import inspect
 import re
 from collections.abc import Callable
 from enum import Enum
-from typing import TypeVar, cast, Any
+from typing import Any, TypeVar, cast
+from urllib.parse import quote
 
 from speedy.types import Scope
 
@@ -11,27 +12,26 @@ T = TypeVar("T")
 
 
 def unwrap_partial(value: T) -> T:
-    """ Unwraps a partial, returning the underlying callable. """
+    """Unwraps a partial, returning the underlying callable."""
 
     # INFO: Bypassing cyclical imports
     from speedy.utils.sync import AsyncCallable
 
     return cast(
-        "T", value.func if isinstance(
-            value, (functools.partial, AsyncCallable)
-        ) else value
+        "T",
+        value.func if isinstance(value, (functools.partial, AsyncCallable)) else value,
     )
 
 
 def get_route_path(scope: Scope) -> str:
-    """ Get route path. """
-    root_path = scope.get("root_path", '')
+    """Get route path."""
+    root_path = scope.get("root_path", "")
     root_path = re.sub(r"^" + root_path, "", scope["path"])
     return root_path
 
 
 def get_endpoint_name(endpoint: Callable[..., Any]) -> str:
-    """ Get endpoint name. """
+    """Get endpoint name."""
     if inspect.iscoroutine(endpoint) or inspect.isclass(endpoint):
         return endpoint.__name__
     cls = type(endpoint)
@@ -39,5 +39,10 @@ def get_endpoint_name(endpoint: Callable[..., Any]) -> str:
 
 
 def get_enum_string_value(value: Enum | str) -> str:
-    """ Return the string value of a string enum. """
+    """Return the string value of a string enum."""
     return value.value if isinstance(value, Enum) else value
+
+
+def url_quote(value: str | bytes) -> str:
+    """Quoute a URL."""
+    return quote(value, safe="/#%[]=:;$&()+,!?*@'~")
