@@ -1,33 +1,24 @@
-from typing import ParamSpec, Iterator, Any
+from __future__ import annotations
 
-from speedy.protocols.middleware import MiddlewareProtocol
+from speedy.enums import ScopeType
+from speedy.middleware._utils import build_exclude_path_pattern
+from speedy.protocols import MiddlewareProtocol
+from speedy.types import ASGIAppType, Scopes
 
-P = ParamSpec('P')
 
+class BaseMiddleware(MiddlewareProtocol):
+    """Abstract middleware providing base functionality common to all middlewares."""
 
-class Middleware:
-    """ Middleware class. """
-    def __init__(self, cls: type[MiddlewareProtocol], *args: P.args, **kwargs: P.kwargs) -> None:
-        self.cls = cls
-        self.args = args
-        self.kwargs = kwargs
-
-    def __iter__(self) -> Iterator[Any]:
-        return iter((self.cls, self.args, self.kwargs))
-
-    def __repr__(self):
-        _class = type(self).__name__
-        args = ', '.join(
-            [self.cls.__name__]
-            + list(self._get_args_to_string())
-            + list(self._get_option_to_string())
+    def __init__(
+        self,
+        app: ASGIAppType,
+        exclude: str | list[str] | None = None,
+        exclude_opt_key: str | None = None,
+        scopes: Scopes | None = None,
+    ) -> None:
+        self.app = app
+        self.scopes = scopes or {ScopeType.HTTP, ScopeType.WEBSOCKET}
+        self.exclude_opt_key = exclude_opt_key
+        self.exclude_pattern = build_exclude_path_pattern(
+            exclude=exclude,
         )
-        return f'{_class}({args})'
-
-    def _get_args_to_string(self) -> Iterator[str]:
-        for value in self.args:
-            yield f'{value!r}'
-
-    def _get_option_to_string(self) -> Iterator[str]:
-        for key, value in self.kwargs:
-            yield f'{key}={value!r}'
