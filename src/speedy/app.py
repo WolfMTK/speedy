@@ -5,12 +5,14 @@ import functools
 import inspect
 import logging
 import os
-from contextlib import asynccontextmanager, AsyncExitStack, AbstractAsyncContextManager
-from typing import Sequence, Mapping, Any, TYPE_CHECKING, AsyncGenerator, Iterable
+from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontextmanager
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable, Mapping, Sequence, cast
 
 from speedy import Router
 from speedy._asgi import ASGIRouter, wrap_in_exception_handler
 from speedy.config import ApplicationConfig, BaseLoggingConfig, LoggingConfig
+from speedy.config.allowed_hosts import AllowedHostsConfig
+from speedy.config.cors import CORSConfig
 from speedy.config.logging import get_logger_placeholder
 from speedy.connection import Request, WebSocket
 from speedy.constants import MULTIPART_FORM_PART_LIMIT, REQUEST_MAX_BODY_SIZE
@@ -21,35 +23,36 @@ from speedy.handlers.base import BaseRouteHandler
 from speedy.handlers.http_handlers.base import HTTPRouteHandler
 from speedy.handlers.websocket_handlers.base import WebsocketRouteHandler
 from speedy.protocols import ILogger
-from speedy.routes import HTTPRoute, ASGIRoute, WebSocketRoute
+from speedy.routes import ASGIRoute, HTTPRoute, WebSocketRoute
 from speedy.types import (
-    ControllerRouterHandler,
     AfterExceptionHookHandler,
     AfterRequestHookHandler,
     AfterResponseHookHandler,
-    BeforeRequestHookHandler,
+    ASGIAppType,
     BeforeMessageSendHookHandler,
-    ExceptionHandlersMap,
-    ParametersMap,
-    ResponseCookies,
-    ResponseHeaders,
-    TypeDecodersSequence,
-    TypeEncodersMap,
-    Scope,
-    Middleware,
-    EmptyType,
+    BeforeRequestHookHandler,
+    ControllerRouterHandler,
     Empty,
+    EmptyType,
+    ExceptionHandlersMap,
     GetLogger,
-    LifespanScope,
-    Receive,
-    LifeSpanReceive,
-    LifeSpanSend,
-    Send,
     Lifespan,
     LifespanHook,
-    ASGIAppType,
+    LifeSpanReceive,
+    LifespanScope,
+    LifeSpanSend,
     Message,
+    Middleware,
+    ParametersMap,
+    Receive,
+    ResponseCookies,
+    ResponseHeaders,
+    RouteHanderMapItem,
     RouteHandlerType,
+    Scope,
+    Send,
+    TypeDecodersSequence,
+    TypeEncodersMap,
 )
 from speedy.utils.predicates import is_async_callable
 from speedy.utils.sync import ensure_async_callable
@@ -60,39 +63,40 @@ if TYPE_CHECKING:
 
 class Speedy(Router):
     def __init__(
-            self,
-            route_handlers: Sequence[ControllerRouterHandler] | None = None,
-            *,
-            after_exception: Sequence[AfterExceptionHookHandler] | None = None,
-            after_request: AfterRequestHookHandler | None = None,
-            after_response: AfterResponseHookHandler | None = None,
-            allowed_hosts: Sequence[str] | None = None,
-            before_request: BeforeRequestHookHandler | None = None,
-            before_send: Sequence[BeforeMessageSendHookHandler] | None = None,
-            debug: bool | None = None,
-            etag: ETag | None = None,
-            exception_handlers: ExceptionHandlersMap | None = None,
-            logging_config: BaseLoggingConfig | EmptyType | None = Empty,
-            middleware: Sequence[Middleware] | None = None,
-            multipart_form_part_limit: int = MULTIPART_FORM_PART_LIMIT,
-            on_shutdown: Sequence[LifespanHook] | None = None,
-            on_startup: Sequence[LifespanHook] | None = None,
-            opt: Mapping[str, Any] | None = None,
-            parameters: ParametersMap | None = None,
-            path: str | None = None,
-            request_class: type[Request] | None = None,
-            request_max_body_size: int | None = REQUEST_MAX_BODY_SIZE,
-            response_class: type[Response] | None = None,
-            response_cookies: ResponseCookies | None = None,
-            response_headers: ResponseHeaders | None = None,
-            signature_namespace: Mapping[str, Any] | None = None,
-            signature_types: Sequence[Any] | None = None,
-            state: State | None = None,
-            tags: Sequence[str] | None = None,
-            type_decoders: TypeDecodersSequence | None = None,
-            type_encoders: TypeEncodersMap | None = None,
-            websocket_class: type[WebSocket] | None = None,
-            lifespan: Lifespan = None,
+        self,
+        route_handlers: Sequence[ControllerRouterHandler] | None = None,
+        *,
+        after_exception: Sequence[AfterExceptionHookHandler] | None = None,
+        after_request: AfterRequestHookHandler | None = None,
+        after_response: AfterResponseHookHandler | None = None,
+        allowed_hosts: Sequence[str] | AllowedHostsConfig | None = None,
+        before_request: BeforeRequestHookHandler | None = None,
+        before_send: Sequence[BeforeMessageSendHookHandler] | None = None,
+        cors_config: CORSConfig | None = None,
+        debug: bool | None = None,
+        etag: ETag | None = None,
+        exception_handlers: ExceptionHandlersMap | None = None,
+        logging_config: BaseLoggingConfig | EmptyType | None = Empty,
+        middleware: Sequence[Middleware] | None = None,
+        multipart_form_part_limit: int = MULTIPART_FORM_PART_LIMIT,
+        on_shutdown: Sequence[LifespanHook] | None = None,
+        on_startup: Sequence[LifespanHook] | None = None,
+        opt: Mapping[str, Any] | None = None,
+        parameters: ParametersMap | None = None,
+        path: str | None = None,
+        request_class: type[Request] | None = None,
+        request_max_body_size: int | None = REQUEST_MAX_BODY_SIZE,
+        response_class: type[Response] | None = None,
+        response_cookies: ResponseCookies | None = None,
+        response_headers: ResponseHeaders | None = None,
+        signature_namespace: Mapping[str, Any] | None = None,
+        signature_types: Sequence[Any] | None = None,
+        state: State | None = None,
+        tags: Sequence[str] | None = None,
+        type_decoders: TypeDecodersSequence | None = None,
+        type_encoders: TypeEncodersMap | None = None,
+        websocket_class: type[WebSocket] | None = None,
+        lifespan: Lifespan = None,
     ) -> None:
         if logging_config is Empty:
             logging_config = LoggingConfig()
@@ -100,13 +104,17 @@ class Speedy(Router):
         if debug is None:
             debug = os.getenv("SPEEDY_DEBUG", "0") == "1"
 
+        if not isinstance(allowed_hosts, AllowedHostsConfig):
+            allowed_hosts = list(allowed_hosts or [])
+
         config = ApplicationConfig(
             after_exception=list(after_exception or []),
             after_request=after_request,
             after_response=after_response,
-            allowed_hosts=list(allowed_hosts or []),
+            allowed_hosts=allowed_hosts,
             before_request=before_request,
             before_send=list(before_send or []),
+            cors_config=cors_config,
             debug=debug,
             etag=etag,
             exception_handlers=exception_handlers or {},
@@ -134,21 +142,28 @@ class Speedy(Router):
             websocket_class=websocket_class,
         )
 
+        self._debug: bool = True
+        self._lifespan_managers = config.lifespan
+
         self.get_logger: GetLogger = get_logger_placeholder
         self.logger: ILogger | None = None
 
-        self.after_exception = [ensure_async_callable(header) for header in config.after_exception]
+        self.after_exception = [
+            ensure_async_callable(header) for header in config.after_exception
+        ]
         self.allowed_hosts = config.allowed_hosts
-        self.before_send = [ensure_async_callable(header) for header in config.before_send]
+        self.before_send = [
+            ensure_async_callable(header) for header in config.before_send
+        ]
+        self.cors_config = config.cors_config
         self.logging_config = config.logging_config
+        self.multipart_form_part_limit = config.multipart_form_part_limit
+        self.on_startup = config.on_startup
+        self.on_shutdown = config.on_shutdown
         self.request_class: type[Request] = config.request_class or Request
         self.state = config.state
         self.websocket_class: type[WebSocket] = config.websocket_class or WebSocket
-        self.on_startup = config.on_startup
-        self.on_shutdown = config.on_shutdown
-
-        self._debug: bool = config.debug
-        self._lifespan_managers = config.lifespan
+        self.debug = config.debug
 
         super().__init__(
             after_request=config.after_request,
@@ -179,6 +194,7 @@ class Speedy(Router):
         self.routes = self._build_routes(
             self._reduce_handlers(self.route_handlers),
         )
+        self.route_handler_method_map = _create_route_handler_method_map(self.routes)
 
         self.route_handlers = ()
 
@@ -191,18 +207,28 @@ class Speedy(Router):
         self.asgi_handler = self._create_asgi_handler()
 
     async def __call__(
-            self,
-            scope: Scope | LifespanScope,
-            receive: Receive | LifeSpanReceive,
-            send: Send | LifeSpanSend,
+        self,
+        scope: Scope | LifespanScope,
+        receive: Receive | LifeSpanReceive,
+        send: Send | LifeSpanSend,
     ) -> None:
         if scope["type"] == "lifespan":
-            await self.asgi_router.lifespan(receive, send)
+            await self.asgi_router.lifespan(
+                receive=cast("LifeSpanReceive", receive),
+                send=cast("LifeSpanSend", send),
+            )
             return
 
         scope["app"] = self
         scope.setdefault("state", {})
-        await self.asgi_handler(scope, receive, self._wrap_send(send=send, scope=scope))
+        await self.asgi_handler(
+            scope,
+            receive,
+            self._wrap_send(
+                send=cast("Send", send),
+                scope=cast("Scope", scope),
+            ),
+        )
 
     @property
     def debug(self) -> bool:
@@ -211,15 +237,19 @@ class Speedy(Router):
     @debug.setter
     def debug(self, value: bool) -> None:
         if self.logger and self.logging_config:
-            self.logging_config.set_level(self.logger, logging.DEBUG if value else logging.INFO)
+            self.logging_config.set_level(
+                self.logger, logging.DEBUG if value else logging.INFO
+            )
         self._debug = value
 
     @asynccontextmanager
     async def lifespan(self) -> AsyncGenerator[None, None]:
-        """ Context manager handling the ASGI lifespan. """
+        """Context manager handling the ASGI lifespan."""
         async with AsyncExitStack() as exit_stack:
             for hook in self.on_shutdown[::-1]:
-                exit_stack.push_async_callback(functools.partial(self._call_lifespan_hook, hook))
+                exit_stack.push_async_callback(
+                    functools.partial(self._call_lifespan_hook, hook)
+                )
 
             for manager in self._lifespan_managers:
                 if not isinstance(manager, AbstractAsyncContextManager):
@@ -253,8 +283,8 @@ class Speedy(Router):
         return send
 
     def _build_routes(
-            self,
-            route_handlers: Iterable[BaseRouteHandler],
+        self,
+        route_handlers: Iterable[BaseRouteHandler],
     ) -> list[HTTPRoute | ASGIRoute | WebSocketRoute]:
         routes = []
         http_path_groups = collections.defaultdict(list)
@@ -269,30 +299,40 @@ class Speedy(Router):
 
         return routes
 
-    def _reduce_handlers(self, handlers: Iterable[ControllerRouterHandler]) -> Iterable[BaseRouteHandler]:
+    def _reduce_handlers(
+        self, handlers: Iterable[ControllerRouterHandler]
+    ) -> Iterable[BaseRouteHandler]:
         for handler, bases in self._iter_handlers(handlers, bases=[self]):
             yield handler.merge(*bases)
 
     def _iter_handlers(
-            self,
-            handlers: Iterable[ControllerRouterHandler],
-            bases: list[Router],
+        self,
+        handlers: Iterable[ControllerRouterHandler],
+        bases: list[Router],
     ) -> Iterable[tuple[BaseRouteHandler, list[Router]]]:
         for handler in handlers:
             handler = self._validate_registration_value(handler)
             if isinstance(handler, Router):
-                yield from self._iter_handlers(handler.route_handlers, bases=[handler, *bases])
+                yield from self._iter_handlers(
+                    handler.route_handlers, bases=[handler, *bases]
+                )
             else:
                 yield handler, bases
 
-    def _validate_registration_value(self, value: ControllerRouterHandler) -> RouteHandlerType | Router:
+    def _validate_registration_value(
+        self, value: ControllerRouterHandler
+    ) -> RouteHandlerType | Router:
         if isinstance(value, Router):
             if value in self:
-                raise ImproperlyConfiguredException("Cannot register a router on itself")
+                raise ImproperlyConfiguredException(
+                    "Cannot register a router on itself"
+                )
 
             return value
 
-        if isinstance(value, (ASGIRouteHandler, HTTPRouteHandler, WebsocketRouteHandler)):
+        if isinstance(
+            value, (ASGIRouteHandler, HTTPRouteHandler, WebsocketRouteHandler)
+        ):
             return value
 
         raise ImproperlyConfiguredException(
@@ -300,3 +340,17 @@ class Speedy(Router):
             "If you passed in a function or method, "
             "make sure to decorate it first with one of the routing decorators",
         )
+
+
+def _create_route_handler_method_map(
+    routes: Sequence[HTTPRoute | ASGIRoute | WebSocketRoute],
+) -> dict[str, RouteHanderMapItem]:
+    route_map = collections.defaultdict(dict)
+    for route in routes:
+        if isinstance(route, HTTPRoute):
+            route_map[route.path] = route.route_handler_map
+        else:
+            route_map[route.path][
+                "websocket" if isinstance(route, WebSocketRoute) else "asgi"
+            ] = route.route_handler
+    return route_map
