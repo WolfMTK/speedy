@@ -194,7 +194,7 @@ class Speedy(Router):
         self.routes = self._build_routes(
             self._reduce_handlers(self.route_handlers),
         )
-        self.route_handler_method_map = _create_route_handler_method_map(self.routes)
+        self.route_handler_method_map = _create_route_handler_map(self.routes)
 
         self.route_handlers = ()
 
@@ -342,7 +342,7 @@ class Speedy(Router):
         )
 
 
-def _create_route_handler_method_map(
+def _create_route_handler_map(
     routes: Sequence[HTTPRoute | ASGIRoute | WebSocketRoute],
 ) -> dict[str, RouteHanderMapItem]:
     route_map = collections.defaultdict(dict)
