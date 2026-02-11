@@ -1,19 +1,12 @@
 from __future__ import annotations
 
-import collections
-import re
 from functools import lru_cache
 from traceback import format_exc
 from typing import TYPE_CHECKING, Any
 
-from speedy._asgi.routing_trie import (
-    RouteTrieNode,
-    create_node,
-    validate_node,
-    parse_path_to_route,
-)
+from speedy._asgi.base import RegExpRouter, LinearRouter
+from speedy.exceptions import NotFoundException
 from speedy.routes import HTTPRoute, WebSocketRoute, ASGIRoute
-from speedy.routes.base import BaseRoute
 from speedy.types import (
     LifeSpanReceive,
     LifeSpanSend,
@@ -28,6 +21,7 @@ from speedy.types import (
     Method,
     ASGIAppType,
     RouteHandlerType,
+    PathParameterDefinition,
 )
 from speedy.utils import normalize_path
 from speedy.utils.scope import ScopeState
@@ -41,15 +35,10 @@ class ASGIRouter:
 
     def __init__(self, app: Speedy) -> None:
         self._app_exception_handlers: ExceptionHandlersMap = app.exception_handlers
-        self._trie_initialized = False
-        self._mount_paths_regex: re.Pattern | None = None
-        self._mount_routes: dict[str, RouteTrieNode] = {}
-        self._plain_routes: set[str] = set()
-        self._registered_routes: set[HTTPRoute | WebSocketRoute | ASGIRoute] = set()
+        self._router_initialized = False
         self.app = app
-        self.root_route_map_node: RouteTrieNode = create_node()
-        self.route_handler_index: dict[str, RouteTrieNode] = {}
-        self.route_mapping: dict[str, list[BaseRoute]] = collections.defaultdict(list)
+        self.linear_router = LinearRouter()
+        self.regexp_router = RegExpRouter()
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         scope.setdefault("path_params", {})
@@ -80,14 +69,16 @@ class ASGIRouter:
             path: str,
             method: Method | None,
     ) -> tuple[ASGIAppType, RouteHandlerType, str, dict[str, Any], str]:
-        return parse_path_to_route(
-            mount_paths_regex=self._mount_paths_regex,
-            mount_routes=self._mount_routes,
-            path=path,
-            plain_routes=self._plain_routes,
-            root_node=self.root_route_map_node,
-            method=method,
-        )
+        result = self.linear_router.match(path=path, method=method)
+        if result is not None:
+            asgi_app, handler, path_params = result
+            path_template = path if not path_params else ""
+            return asgi_app, handler, path, path_params, path_template
+        result = self.regexp_router.match(path=path, method=method)
+        if result is not None:
+            asgi_app, handler, path_params, path_template = result
+            return asgi_app, handler, path, path_params, path_template
+        raise NotFoundException()
 
     async def lifespan(self, receive: LifeSpanReceive, send: LifeSpanSend) -> None:
         """ Handle the ASGI `lifespan` event on application startup and shutdown. """
@@ -122,15 +113,42 @@ class ASGIRouter:
 
     def construct_routing_trie(self) -> None:
         """ Create a map of the app's routes. """
-        if self._trie_initialized:
-            self._mount_paths_regex = None
-            self._mount_routes = {}
-            self._plain_routes = set()
-            self._registered_routes = set()
-            self.root_route_map_node = create_node()
-            self.route_handler_index = {}
-            self.route_mapping = collections.defaultdict(list)
+        if self._router_initialized:
+            self.linear_router.clear()
+            self.regexp_router.clear()
 
-        validate_node(node=self.root_route_map_node)
-        if self._mount_routes:
-            self._mount_paths_regex = re.compile("|".join(sorted(set(self._mount_routes))))
+        for route in self.app.routes:
+            self._add_route(route)
+
+        self._router_initialized = True
+
+    def _add_route(self, route: HTTPRoute | WebSocketRoute | ASGIRoute) -> None:
+        param_names = [
+            param.name for param in route.path_components
+            if isinstance(param, PathParameterDefinition)
+        ]
+        is_dynamic = len(param_names) > 0
+        if isinstance(route, HTTPRoute):
+            for route_handler in route.route_handlers:
+                for method in route_handler.http_methods:
+                    self.linear_router.add_route(
+                        path=route.path,
+                        method=method,
+                        path_components=route.path_components,
+                        asgi_app=route.handle,
+                        handler=route_handler,
+                        is_dynamic=is_dynamic,
+                    )
+        elif isinstance(route, WebSocketRoute) or isinstance(route, ASGIRoute):
+            _method = {
+                WebSocketRoute: "websocket",
+                ASGIRoute: "asgi"
+            }
+            self.linear_router.add_route(
+                path=route.path,
+                method=_method.get(route),  # noqa
+                path_components=route.path_components,
+                asgi_app=route.handle,
+                handler=route.route_handler,
+                is_dynamic=is_dynamic,
+            )
