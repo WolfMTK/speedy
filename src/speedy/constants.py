@@ -18,3 +18,5 @@ DEFAULT_ALLOWED_CORS_HEADERS: Final = {
     "Content-Language",
     "Content-Type",
 }
+
+ZERO = 0
