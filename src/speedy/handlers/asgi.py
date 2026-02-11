@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Sequence, Mapping, Any
+from typing import Sequence, Mapping, Any, Callable
 
 from speedy.connection.base import ASGIConnection
 from speedy.handlers.base import BaseRouteHandler
@@ -38,3 +38,27 @@ class ASGIRouteHandler(BaseRouteHandler):
             receive=connection.receive,
             send=connection.send,
         )
+
+
+
+# TODO: transfer the implementation to Speedy, APIRouter
+def asgi(
+        path: str | Sequence[str] | None = None,
+        *,
+        exception_handlers: ExceptionHandlersMap | None = None,
+        name: str | None = None,
+        handler_class: type[ASGIRouteHandler] = ASGIRouteHandler,
+        **kwargs: Any,
+) -> Callable[[AsyncAnyCallable], ASGIRouteHandler]:
+    """ Create an ASGIRouteHandler. """
+
+    def decorator(fn: AsyncAnyCallable) -> ASGIRouteHandler:
+        return handler_class(
+            fn=fn,
+            path=path,
+            exception_handlers=exception_handlers,
+            name=name,
+            **kwargs,
+        )
+
+    return decorator
