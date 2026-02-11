@@ -37,8 +37,8 @@ class BaseRouteHandler:
         self.name = name
         self.paths = self._get_paths(path)
         self.fn = fn
-        self.type_decoders = type_decoders or {}
-        self.type_encoders = type_encoders or {}
+        self.type_decoders = tuple(type_decoders or ())
+        self.type_encoders = dict(type_encoders or {})
 
     def merge(self, *others: Router) -> BaseRouteHandler:
         """ Merges another route handler with this route handlers. """
@@ -74,7 +74,7 @@ class BaseRouteHandler:
             merge_opts["type_encoders"] = getattr(other, "type_encoders", {}) | merge_opts["type_encoders"]
             merge_opts["parameters"] = getattr(other, "parameters", {}) | merge_opts["parameters"]
 
-            merge_opts["middleware"] = getattr(other, "middleware", ()) + merge_opts["middleware"]
-            merge_opts["type_decoders"] = merge_opts["type_decoders"] + getattr(other, "type_decoders", ())
+            merge_opts["middleware"] = tuple(getattr(other, "middleware", ())) + merge_opts["middleware"]
+            merge_opts["type_decoders"] = merge_opts["type_decoders"] + tuple(getattr(other, "type_decoders", ()))
 
         return merge_opts
