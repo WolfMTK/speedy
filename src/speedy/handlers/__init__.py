@@ -1,3 +1,3 @@
-from speedy.handlers.asgi import ASGIRouteHandler
+from speedy.handlers.asgi import ASGIRouteHandler, asgi
 
-__all__ = ("ASGIRouteHandler",)
+__all__ = ("ASGIRouteHandler", "asgi")
