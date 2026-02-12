@@ -140,7 +140,7 @@ class ASGIRouter:
             }
             self.router.add_route(
                 path=route.path,
-                method=_method.get(route),  # noqa
+                method=_method.get(type(route)),
                 path_components=route.path_components,
                 asgi_app=route.handle,
                 handler=route.route_handler,
