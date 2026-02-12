@@ -125,7 +125,7 @@ class ASGIRouter:
         if isinstance(route, HTTPRoute):
             for route_handler in route.route_handlers:
                 for method in route_handler.http_methods:
-                    self.linear_router.add_route(
+                    self.router.add_route(
                         path=route.path,
                         method=method,
                         path_components=route.path_components,
@@ -138,7 +138,7 @@ class ASGIRouter:
                 WebSocketRoute: "websocket",
                 ASGIRoute: "asgi"
             }
-            self.linear_router.add_route(
+            self.router.add_route(
                 path=route.path,
                 method=_method.get(route),  # noqa
                 path_components=route.path_components,
