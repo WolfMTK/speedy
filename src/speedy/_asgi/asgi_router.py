@@ -4,7 +4,7 @@ from functools import lru_cache
 from traceback import format_exc
 from typing import TYPE_CHECKING, Any
 
-from speedy._asgi.base import RegExpRouter, LinearRouter
+from speedy._asgi.base import RegExpRouter, SmartRouter, TrieRouter
 from speedy.exceptions import NotFoundException
 from speedy.routes import HTTPRoute, WebSocketRoute, ASGIRoute
 from speedy.types import (
@@ -37,8 +37,7 @@ class ASGIRouter:
         self._app_exception_handlers: ExceptionHandlersMap = app.exception_handlers
         self._router_initialized = False
         self.app = app
-        self.linear_router = LinearRouter()
-        self.regexp_router = RegExpRouter()
+        self.router = SmartRouter(routers=[RegExpRouter(), TrieRouter()])
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         scope.setdefault("path_params", {})
@@ -69,12 +68,7 @@ class ASGIRouter:
             path: str,
             method: Method | None,
     ) -> tuple[ASGIAppType, RouteHandlerType, str, dict[str, Any], str]:
-        result = self.linear_router.match(path=path, method=method)
-        if result is not None:
-            asgi_app, handler, path_params = result
-            path_template = path if not path_params else ""
-            return asgi_app, handler, path, path_params, path_template
-        result = self.regexp_router.match(path=path, method=method)
+        result = self.router.match(path=path, method=method)
         if result is not None:
             asgi_app, handler, path_params, path_template = result
             return asgi_app, handler, path, path_params, path_template
@@ -114,12 +108,12 @@ class ASGIRouter:
     def construct_routing_trie(self) -> None:
         """ Create a map of the app's routes. """
         if self._router_initialized:
-            self.linear_router.clear()
-            self.regexp_router.clear()
+            self.router.clear()
 
         for route in self.app.routes:
             self._add_route(route)
 
+        self.router.construct()
         self._router_initialized = True
 
     def _add_route(self, route: HTTPRoute | WebSocketRoute | ASGIRoute) -> None:
