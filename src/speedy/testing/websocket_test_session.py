@@ -7,7 +7,7 @@ from typing import Any, TYPE_CHECKING
 import anyio.abc
 from anyio.streams.stapled import StapledObjectStream
 
-from speedy.types import WebSocketScope, ASGIAppType, WebSocketSendMessage, WebSocketReceiveMessage
+from speedy.types import WebSocketScope, ASGIApp
 
 if TYPE_CHECKING:
     from speedy.testing.client.sync_client import TestClient
@@ -32,7 +32,7 @@ class AsyncWebSocketTestSession:
     def __init__(
             self,
             *,
-            app: ASGIAppType,
+            app: ASGIApp,
             scope: WebSocketScope,
             connect_timeout: float | None = None,
             tg: anyio.abc.TaskGroup,
@@ -44,10 +44,10 @@ class AsyncWebSocketTestSession:
 
         self._tg = tg
         self._send_stream = StapledObjectStream(
-            *anyio.create_memory_object_stream["WebSocketSendMessage"](math.inf)
+            *anyio.create_memory_object_stream["WebSocketSendMessage"](math.inf),
         )
         self._receive_stream = StapledObjectStream(
-            *anyio.create_memory_object_stream["WebSocketReceiveMessage"](math.inf)
+            *anyio.create_memory_object_stream["WebSocketReceiveMessage"](math.inf),
         )
         self._exit_stack = contextlib.AsyncExitStack()
         self._connect_timeout = connect_timeout

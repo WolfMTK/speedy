@@ -28,7 +28,6 @@ from speedy.types import (
     AfterExceptionHookHandler,
     AfterRequestHookHandler,
     AfterResponseHookHandler,
-    ASGIAppType,
     BeforeMessageSendHookHandler,
     BeforeRequestHookHandler,
     ControllerRouterHandler,
@@ -53,6 +52,7 @@ from speedy.types import (
     Send,
     TypeDecodersSequence,
     TypeEncodersMap,
+    ASGIApp,
 )
 from speedy.utils.predicates import is_async_callable
 from speedy.utils.sync import ensure_async_callable
@@ -63,40 +63,40 @@ if TYPE_CHECKING:
 
 class Speedy(Router):
     def __init__(
-        self,
-        route_handlers: Sequence[ControllerRouterHandler] | None = None,
-        *,
-        after_exception: Sequence[AfterExceptionHookHandler] | None = None,
-        after_request: AfterRequestHookHandler | None = None,
-        after_response: AfterResponseHookHandler | None = None,
-        allowed_hosts: Sequence[str] | AllowedHostsConfig | None = None,
-        before_request: BeforeRequestHookHandler | None = None,
-        before_send: Sequence[BeforeMessageSendHookHandler] | None = None,
-        cors_config: CORSConfig | None = None,
-        debug: bool | None = None,
-        etag: ETag | None = None,
-        exception_handlers: ExceptionHandlersMap | None = None,
-        logging_config: BaseLoggingConfig | EmptyType | None = Empty,
-        middleware: Sequence[Middleware] | None = None,
-        multipart_form_part_limit: int = MULTIPART_FORM_PART_LIMIT,
-        on_shutdown: Sequence[LifespanHook] | None = None,
-        on_startup: Sequence[LifespanHook] | None = None,
-        opt: Mapping[str, Any] | None = None,
-        parameters: ParametersMap | None = None,
-        path: str | None = None,
-        request_class: type[Request] | None = None,
-        request_max_body_size: int | None = REQUEST_MAX_BODY_SIZE,
-        response_class: type[Response] | None = None,
-        response_cookies: ResponseCookies | None = None,
-        response_headers: ResponseHeaders | None = None,
-        signature_namespace: Mapping[str, Any] | None = None,
-        signature_types: Sequence[Any] | None = None,
-        state: State | None = None,
-        tags: Sequence[str] | None = None,
-        type_decoders: TypeDecodersSequence | None = None,
-        type_encoders: TypeEncodersMap | None = None,
-        websocket_class: type[WebSocket] | None = None,
-        lifespan: Lifespan = None,
+            self,
+            route_handlers: Sequence[ControllerRouterHandler] | None = None,
+            *,
+            after_exception: Sequence[AfterExceptionHookHandler] | None = None,
+            after_request: AfterRequestHookHandler | None = None,
+            after_response: AfterResponseHookHandler | None = None,
+            allowed_hosts: Sequence[str] | AllowedHostsConfig | None = None,
+            before_request: BeforeRequestHookHandler | None = None,
+            before_send: Sequence[BeforeMessageSendHookHandler] | None = None,
+            cors_config: CORSConfig | None = None,
+            debug: bool | None = None,
+            etag: ETag | None = None,
+            exception_handlers: ExceptionHandlersMap | None = None,
+            logging_config: BaseLoggingConfig | EmptyType | None = Empty,
+            middleware: Sequence[Middleware] | None = None,
+            multipart_form_part_limit: int = MULTIPART_FORM_PART_LIMIT,
+            on_shutdown: Sequence[LifespanHook] | None = None,
+            on_startup: Sequence[LifespanHook] | None = None,
+            opt: Mapping[str, Any] | None = None,
+            parameters: ParametersMap | None = None,
+            path: str | None = None,
+            request_class: type[Request] | None = None,
+            request_max_body_size: int | None = REQUEST_MAX_BODY_SIZE,
+            response_class: type[Response] | None = None,
+            response_cookies: ResponseCookies | None = None,
+            response_headers: ResponseHeaders | None = None,
+            signature_namespace: Mapping[str, Any] | None = None,
+            signature_types: Sequence[Any] | None = None,
+            state: State | None = None,
+            tags: Sequence[str] | None = None,
+            type_decoders: TypeDecodersSequence | None = None,
+            type_encoders: TypeEncodersMap | None = None,
+            websocket_class: type[WebSocket] | None = None,
+            lifespan: Lifespan = None,
     ) -> None:
         if logging_config is Empty:
             logging_config = LoggingConfig()
@@ -207,10 +207,10 @@ class Speedy(Router):
         self.asgi_handler = self._create_asgi_handler()
 
     async def __call__(
-        self,
-        scope: Scope | LifespanScope,
-        receive: Receive | LifeSpanReceive,
-        send: Send | LifeSpanSend,
+            self,
+            scope: Scope | LifespanScope,
+            receive: Receive | LifeSpanReceive,
+            send: Send | LifeSpanSend,
     ) -> None:
         if scope["type"] == "lifespan":
             await self.asgi_router.lifespan(
@@ -238,7 +238,7 @@ class Speedy(Router):
     def debug(self, value: bool) -> None:
         if self.logger and self.logging_config:
             self.logging_config.set_level(
-                self.logger, logging.DEBUG if value else logging.INFO
+                self.logger, logging.DEBUG if value else logging.INFO,
             )
         self._debug = value
 
@@ -248,7 +248,7 @@ class Speedy(Router):
         async with AsyncExitStack() as exit_stack:
             for hook in self.on_shutdown[::-1]:
                 exit_stack.push_async_callback(
-                    functools.partial(self._call_lifespan_hook, hook)
+                    functools.partial(self._call_lifespan_hook, hook),
                 )
 
             for manager in self._lifespan_managers:
@@ -266,7 +266,7 @@ class Speedy(Router):
         if is_async_callable(hook):
             await res
 
-    def _create_asgi_handler(self) -> ASGIAppType:
+    def _create_asgi_handler(self) -> ASGIApp:
         asgi_handler = wrap_in_exception_handler(app=self.asgi_router)
 
         return asgi_handler
@@ -283,8 +283,8 @@ class Speedy(Router):
         return send
 
     def _build_routes(
-        self,
-        route_handlers: Iterable[BaseRouteHandler],
+            self,
+            route_handlers: Iterable[BaseRouteHandler],
     ) -> list[HTTPRoute | ASGIRoute | WebSocketRoute]:
         routes = []
         http_path_groups = collections.defaultdict(list)
@@ -300,38 +300,38 @@ class Speedy(Router):
         return routes
 
     def _reduce_handlers(
-        self, handlers: Iterable[ControllerRouterHandler]
+            self, handlers: Iterable[ControllerRouterHandler]
     ) -> Iterable[BaseRouteHandler]:
         for handler, bases in self._iter_handlers(handlers, bases=[self]):
             yield handler.merge(*bases)
 
     def _iter_handlers(
-        self,
-        handlers: Iterable[ControllerRouterHandler],
-        bases: list[Router],
+            self,
+            handlers: Iterable[ControllerRouterHandler],
+            bases: list[Router],
     ) -> Iterable[tuple[BaseRouteHandler, list[Router]]]:
         for handler in handlers:
             handler = self._validate_registration_value(handler)
             if isinstance(handler, Router):
                 yield from self._iter_handlers(
-                    handler.route_handlers, bases=[handler, *bases]
+                    handler.route_handlers, bases=[handler, *bases],
                 )
             else:
                 yield handler, bases
 
     def _validate_registration_value(
-        self, value: ControllerRouterHandler
+            self, value: ControllerRouterHandler
     ) -> RouteHandlerType | Router:
         if isinstance(value, Router):
             if value in self:
                 raise ImproperlyConfiguredException(
-                    "Cannot register a router on itself"
+                    "Cannot register a router on itself",
                 )
 
             return value
 
         if isinstance(
-            value, (ASGIRouteHandler, HTTPRouteHandler, WebsocketRouteHandler)
+                value, (ASGIRouteHandler, HTTPRouteHandler, WebsocketRouteHandler),
         ):
             return value
 
@@ -343,7 +343,7 @@ class Speedy(Router):
 
 
 def _create_route_handler_map(
-    routes: Sequence[HTTPRoute | ASGIRoute | WebSocketRoute],
+        routes: Sequence[HTTPRoute | ASGIRoute | WebSocketRoute],
 ) -> dict[str, RouteHanderMapItem]:
     route_map = collections.defaultdict(dict)
     for route in routes:

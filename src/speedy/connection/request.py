@@ -17,7 +17,7 @@ from speedy.datastructures import FormMultiDict, Accept
 from speedy.exceptions import RequestException, InternalServerException
 from speedy.handlers.http_handlers.base import HTTPRouteHandler
 from speedy.types import Scope, Receive, Send, Method
-from speedy.types.asgi_types import HTTPServerPushEvent
+from speedy.types import HTTPServerPushEvent
 
 SERVER_PUSH_HEADERS = {
     "accept",

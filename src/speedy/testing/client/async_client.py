@@ -13,9 +13,10 @@ from speedy.testing.client._base import _prepare_ws_connect_request, _get_sessio
 from speedy.testing.lifespan_handler import LifeSpanHandler
 from speedy.testing.transport import TestClientTransport, ConnectionUpgradeExceptionError
 from speedy.testing.websocket_test_session import AsyncWebSocketTestSession
-from speedy.types import ASGIAppType
+from speedy.types import ASGIApp
 
-T = TypeVar("T", bound=ASGIAppType)
+T = TypeVar("T", bound=ASGIApp)
+
 
 class AsyncTestClient(AsyncClient, Generic[T]):
     def __init__(

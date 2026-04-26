@@ -25,10 +25,10 @@ from speedy.types import (
     ResponseHeaders,
     TypeDecodersSequence,
     TypeEncodersMap,
+    ASGIApp,
 )
 
 if TYPE_CHECKING:
-    from speedy import Speedy
     from speedy.config import BaseLoggingConfig
     from speedy.connection import Request, WebSocket
     from speedy.response import Response
@@ -60,8 +60,8 @@ class ApplicationConfig:
     response_cookies: ResponseCookies = field(default_factory=list)
     response_headers: ResponseHeaders = field(default_factory=list)
     lifespan: list[
-        Callable[[Speedy], AbstractAsyncContextManager] | AbstractAsyncContextManager
-    ] = field(
+        Callable[[ASGIApp], AbstractAsyncContextManager] | AbstractAsyncContextManager
+        ] = field(
         default_factory=list,
     )
     route_handlers: list[ControllerRouterHandler] = field(default_factory=list)

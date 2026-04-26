@@ -10,7 +10,7 @@ from anyio import create_memory_object_stream
 from anyio.streams.stapled import StapledObjectStream
 
 from speedy.types import (
-    ASGIAppType,
+    ASGIApp,
     LifespanStartupEvent,
     LifeSpanSendMessage,
     LifespanShutdownEvent,
@@ -19,12 +19,12 @@ from speedy.types import (
 
 
 class LifeSpanHandler:
-    def __init__(self, app: ASGIAppType) -> None:
+    def __init__(self, app: ASGIApp) -> None:
         self.stream_send = StapledObjectStream[Optional["LifeSpanSendMessage"]](
-            *create_memory_object_stream(inf)
+            *create_memory_object_stream(inf),
         )
         self.stream_receive = StapledObjectStream["LifeSpanReceiveMessage"](
-            *create_memory_object_stream(inf)
+            *create_memory_object_stream(inf),
         )
         self.app = app
         self._exit_stack = contextlib.AsyncExitStack()
@@ -61,7 +61,7 @@ class LifeSpanHandler:
         ):
             raise RuntimeError(
                 "Received unexpected ASGI message type. Expected `lifespan.startup.complete` or "
-                f"`lifespan.startup.failed`. Got {message['type']!r}"
+                f"`lifespan.startup.failed`. Got {message['type']!r}",
             )
         if message["type"] == "lifespan.startup.failed":
             await self.receive()

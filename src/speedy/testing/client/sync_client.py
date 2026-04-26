@@ -13,9 +13,9 @@ from speedy.testing.client._base import _prepare_ws_connect_request, _get_sessio
 from speedy.testing.lifespan_handler import LifeSpanHandler
 from speedy.testing.transport import SyncTestClientTransport, ConnectionUpgradeExceptionError
 from speedy.testing.websocket_test_session import WebSocketTestSession
-from speedy.types import ASGIAppType, AnyIOBackend
+from speedy.types import ASGIApp, AnyIOBackend
 
-T = TypeVar("T", bound=ASGIAppType)
+T = TypeVar("T", bound=ASGIApp)
 
 
 class TestClient(Client, Generic[T]):
@@ -51,7 +51,7 @@ class TestClient(Client, Generic[T]):
                 backend=backend,
                 backend_options=backend_options,
                 name="test_client",
-            )
+            ),
         )
 
         super().__init__(

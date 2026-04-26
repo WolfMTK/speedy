@@ -12,7 +12,6 @@ RouteHandlerType: TypeAlias = (
 )
 
 RouterHandler: TypeAlias = "RouteHandlerType | Callable[..., Any]"
-RouterHandler: TypeAlias = "RouteHandlerType | Callable[..., Any]"
 
 ControllerRouterHandler: TypeAlias = "RouteHandlerType | Callable[..., Any]"
 

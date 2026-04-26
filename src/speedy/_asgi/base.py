@@ -4,7 +4,7 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from speedy.types import Method, PathParameterDefinition, ASGIAppType, RouteHandlerType
+from speedy.types import Method, PathParameterDefinition, ASGIApp, RouteHandlerType
 
 
 @dataclass
@@ -13,7 +13,7 @@ class RouteEntry:
     method: Method | str
     path: str
     path_components: list[str | PathParameterDefinition]
-    asgi_app: ASGIAppType
+    asgi_app: ASGIApp
     handler: RouteHandlerType
     is_dynamic: bool
 
@@ -23,7 +23,7 @@ class CompileRoute:
     """ A route compiled into a regex pattern for matching. """
     pattern: re.Pattern[str]
     method: Method | str
-    asgi_app: ASGIAppType
+    asgi_app: ASGIApp
     handler: RouteHandlerType
     path_template: str
     param_names: list[str] = field(default_factory=list)
@@ -39,7 +39,7 @@ class BaseRouter(ABC):
             path: str,
             method: Method | str,
             path_components: list[str | PathParameterDefinition],
-            asgi_app: ASGIAppType,
+            asgi_app: ASGIApp,
             handler: RouteHandlerType,
             is_dynamic: bool = False,
     ) -> None: ...
@@ -49,7 +49,7 @@ class BaseRouter(ABC):
             self,
             path: str,
             method: Method | None = None,
-    ) -> tuple[ASGIAppType, RouteHandlerType, dict[str, str], str] | None: ...
+    ) -> tuple[ASGIApp, RouteHandlerType, dict[str, str], str] | None: ...
 
     @abstractmethod
     def clear(self) -> None: ...
@@ -62,7 +62,7 @@ class _TrieNode:
         self.children: dict[str, _TrieNode] = {}
         self.param_child: _TrieNode | None = None
         self.param_definition: PathParameterDefinition | None = None
-        self.handlers: dict[str, tuple[ASGIAppType, RouteHandlerType, str]] = {}
+        self.handlers: dict[str, tuple[ASGIApp, RouteHandlerType, str]] = {}
 
 
 class TrieRouter(BaseRouter):
@@ -81,7 +81,7 @@ class TrieRouter(BaseRouter):
             path: str,
             method: Method | str,
             path_components: list[str | PathParameterDefinition],
-            asgi_app: ASGIAppType,
+            asgi_app: ASGIApp,
             handler: RouteHandlerType,
             is_dynamic: bool = False,
     ) -> None:
@@ -112,7 +112,7 @@ class TrieRouter(BaseRouter):
             self,
             path: str,
             method: Method | None = None,
-    ) -> tuple[ASGIAppType, RouteHandlerType, dict[str, str], str] | None:
+    ) -> tuple[ASGIApp, RouteHandlerType, dict[str, str], str] | None:
         """ Find the handler registered for path and method. """
         if method is not None:
             hit = self._static_map.get((method, path)) or self._static_map.get(("asgi", path))
@@ -142,7 +142,7 @@ class TrieRouter(BaseRouter):
             parts: list[str],
             index: int,
             method: Method | None,
-    ) -> tuple[ASGIAppType, RouteHandlerType, dict[str, str], str] | None:
+    ) -> tuple[ASGIApp, RouteHandlerType, dict[str, str], str] | None:
 
         if index == len(parts):
             return self._resolve_handler(node, method)
@@ -168,7 +168,7 @@ class TrieRouter(BaseRouter):
             self,
             node: _TrieNode,
             method: Method | None,
-    ) -> tuple[ASGIAppType, RouteHandlerType, dict[str, str], str] | None:
+    ) -> tuple[ASGIApp, RouteHandlerType, dict[str, str], str] | None:
         if method is not None:
             entry = node.handlers.get(method) or node.handlers.get("asgi")
         else:
@@ -196,7 +196,7 @@ class RegExpRouter(BaseRouter):
             path: str,
             method: Method | str,
             path_components: list[str | PathParameterDefinition],
-            asgi_app: ASGIAppType,
+            asgi_app: ASGIApp,
             handler: RouteHandlerType,
             is_dynamic: bool = False,
     ) -> None:
@@ -215,7 +215,7 @@ class RegExpRouter(BaseRouter):
             self,
             path: str,
             method: Method | None = None,
-    ) -> tuple[ASGIAppType, RouteHandlerType, dict[str, str], str] | None:
+    ) -> tuple[ASGIApp, RouteHandlerType, dict[str, str], str] | None:
         """ Match path against the compiled combined regex for method. """
         if not self._built:
             self._build()
@@ -263,13 +263,13 @@ class RegExpRouter(BaseRouter):
             return
 
         by_method: dict[str, list[tuple[str, list[str | PathParameterDefinition],
-        ASGIAppType, RouteHandlerType, bool]]] = {}
+        ASGIApp, RouteHandlerType, bool]]] = {}
         for path, method, components, app, handler, is_dynamic in self._pending:
             by_method.setdefault(method, []).append((path, components, app, handler, is_dynamic))
 
         for method, entries in by_method.items():
             alternatives: list[str] = []
-            meta: list[tuple[list[str], ASGIAppType, RouteHandlerType, str]] = []
+            meta: list[tuple[list[str], ASGIApp, RouteHandlerType, str]] = []
 
             for idx, (path, components, asgi_app, handler, is_dynamic) in enumerate(entries):
                 regex_parts: list[str] = []
@@ -329,7 +329,7 @@ class RouteAnalysis:
 
 def _analyse_routes(
         pending: list[tuple[str, Method | str, list[str | PathParameterDefinition],
-        ASGIAppType, RouteHandlerType, bool]],
+        ASGIApp, RouteHandlerType, bool]],
 ) -> RouteAnalysis:
     if not pending:
         return RouteAnalysis()
@@ -377,7 +377,7 @@ class SmartRouter(BaseRouter):
 
     def __init__(self, routers: list[BaseRouter] | None = None) -> None:
         self.routers = routers or [RegExpRouter(), TrieRouter()]
-        self._active_router  = None
+        self._active_router = None
         self._analysis = None
         self._pending = []
         self._route_count = 0
@@ -387,7 +387,7 @@ class SmartRouter(BaseRouter):
             path: str,
             method: Method | str,
             path_components: list[str | PathParameterDefinition],
-            asgi_app: ASGIAppType,
+            asgi_app: ASGIApp,
             handler: RouteHandlerType,
             is_dynamic: bool = False,
     ) -> None:
@@ -431,7 +431,7 @@ class SmartRouter(BaseRouter):
             self,
             path: str,
             method: Method | None = None,
-    ) -> tuple[ASGIAppType, RouteHandlerType, dict[str, str], str] | None:
+    ) -> tuple[ASGIApp, RouteHandlerType, dict[str, str], str] | None:
         """ Delegate to the active router. """
         if self._active_router is None:
             self.construct()

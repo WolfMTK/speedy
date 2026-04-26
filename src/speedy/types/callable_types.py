@@ -3,11 +3,9 @@ from contextlib import AbstractAsyncContextManager
 from typing import Sequence
 from typing import TypeAlias, Any, TYPE_CHECKING, TypeVar
 
-
+from speedy.types.asgi_types import ASGIApp
 
 if TYPE_CHECKING:
-    from speedy import Speedy
-    from speedy.protocols.app import ASGIApplication
     from speedy.response.base import Response
     from speedy.connection.request import Request
     from speedy.types import Scope, Message
@@ -19,10 +17,10 @@ AfterExceptionHookHandler: TypeAlias = "Callable[[ExceptionT, Scope], SyncOrAsyn
 
 # Request hook
 AsyncAfterRequestHookHandler: TypeAlias = (
-    "Callable[[ASGIApplication], Awaitable[ASGIApplication]] | Callable[[Response], Awaitable[Response]]"
+    "Callable[[ASGIApp], Awaitable[ASGIApp]] | Callable[[Response], Awaitable[Response]]"
 )
 
-SyncAfterRequestHookHandler: TypeAlias = "Callable[[ASGIApplication], ASGIApplication] | Callable[[Response], Response]"
+SyncAfterRequestHookHandler: TypeAlias = "Callable[[ASGIApp], ASGIApp] | Callable[[Response], Response]"
 
 AfterRequestHookHandler: TypeAlias = "AsyncAfterRequestHookHandler | SyncAfterRequestHookHandler"
 
@@ -51,9 +49,9 @@ ExceptionLoggingHandler: TypeAlias = "Callable[[ILogger, Scope, list[str]], None
 
 GetLogger: TypeAlias = "Callable[..., ILogger]"
 
-Lifespan: TypeAlias = "Sequence[Callable[[Speedy], AbstractAsyncContextManager] | AbstractAsyncContextManager] | None"
+Lifespan: TypeAlias = "Sequence[Callable[[ASGIApp], AbstractAsyncContextManager] | AbstractAsyncContextManager] | None"
 
-LifespanHook: TypeAlias = "Callable[[Speedy], SyncOrAsyncUnion[Any]] | Callable[[], SyncOrAsyncUnion[Any]]"
+LifespanHook: TypeAlias = "Callable[[ASGIApp], SyncOrAsyncUnion[Any]] | Callable[[], SyncOrAsyncUnion[Any]]"
 
 AnyCallable: TypeAlias = Callable[..., Any]
 

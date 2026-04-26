@@ -5,7 +5,7 @@ from urllib.parse import SplitResult, urlsplit, urlunsplit, urlencode
 
 from speedy._parsers import parse_query_string
 from speedy.datastructures.multi_dicts import MultiDict, ImmutableMultiDict
-from speedy.types.asgi_types import Scope
+from speedy.types import Scope
 
 
 class Address(NamedTuple):

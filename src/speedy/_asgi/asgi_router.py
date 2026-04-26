@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from traceback import format_exc
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from speedy._asgi.base import RegExpRouter, SmartRouter, TrieRouter
 from speedy.exceptions import NotFoundException
@@ -19,21 +19,18 @@ from speedy.types import (
     Send,
     ExceptionHandlersMap,
     Method,
-    ASGIAppType,
+    ASGIApp,
     RouteHandlerType,
     PathParameterDefinition,
 )
 from speedy.utils import normalize_path
 from speedy.utils.scope import ScopeState
 
-if TYPE_CHECKING:
-    from speedy import Speedy
-
 
 class ASGIRouter:
     """ Speedy ASGI router. """
 
-    def __init__(self, app: Speedy) -> None:
+    def __init__(self, app: ASGIApp) -> None:
         self._app_exception_handlers: ExceptionHandlersMap = app.exception_handlers
         self._router_initialized = False
         self.app = app
@@ -67,7 +64,7 @@ class ASGIRouter:
             self,
             path: str,
             method: Method | None,
-    ) -> tuple[ASGIAppType, RouteHandlerType, str, dict[str, Any], str]:
+    ) -> tuple[ASGIApp, RouteHandlerType, str, dict[str, Any], str]:
         result = self.router.match(path=path, method=method)
         if result is not None:
             asgi_app, handler, path_params, path_template = result

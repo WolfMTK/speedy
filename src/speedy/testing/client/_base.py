@@ -17,7 +17,7 @@ from speedy import ScopeType
 from speedy.connection.base import ASGIConnection
 from speedy.datastructures import MutableHeaders
 from speedy.status_code import HTTP_200_OK
-from speedy.types import HTTPResponseStartEvent, ASGIAppType, HTTPScope
+from speedy.types import HTTPResponseStartEvent, ASGIApp, HTTPScope
 from speedy.utils.scope import ScopeState
 
 if TYPE_CHECKING:
@@ -34,7 +34,7 @@ def fake_http_send_message(headers: MutableHeaders) -> HTTPResponseStartEvent:
     )
 
 
-def fake_asgi_connection(app: ASGIAppType, cookies: dict[str, str]) -> ASGIConnection[Any, Any, Any, Any]:
+def fake_asgi_connection(app: ASGIApp, cookies: dict[str, str]) -> ASGIConnection[Any, Any, Any, Any]:
     scope: HTTPScope = {
         "type": ScopeType.HTTP,
         "path": "/",

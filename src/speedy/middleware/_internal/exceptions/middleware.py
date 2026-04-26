@@ -3,14 +3,14 @@ from typing import Any
 from speedy.connection import Request
 from speedy.exceptions.responses import create_exception_response
 from speedy.response import Response
-from speedy.types import ASGIAppType, Scope, Receive, Send, Message
+from speedy.types import ASGIApp, Scope, Receive, Send, Message
 from speedy.utils.scope import ScopeState
 
 
 class ExceptionHandlerMiddleware:
-    """ Middleware used to wrap an ASGIAppType inside a try catch block and handle any exceptions raised. """
+    """ Middleware used to wrap an ASGIApp inside a try catch block and handle any exceptions raised. """
 
-    def __init__(self, app: ASGIAppType) -> None:
+    def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:

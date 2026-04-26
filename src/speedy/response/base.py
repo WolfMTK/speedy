@@ -7,13 +7,13 @@ from datetime import datetime
 from typing import TypeVar, Any, ClassVar, Generic, overload, TYPE_CHECKING
 
 from speedy.background import BackgroundTask, BackgroundTasks
-from speedy.enums import MediaType
-
 from speedy.datastructures import MutableHeaders, Cookie, ETag
+from speedy.enums import MediaType
 from speedy.exceptions.http_exceptions import ImproperlyConfiguredException
 from speedy.serialization import encode_json, encode_msgpack
 from speedy.serialization.base import default_serializer
 from speedy.status_code import HTTP_200_OK, HTTP_204_NO_CONTENT, HTTP_304_NOT_MODIFIED
+from speedy.types import HTTPResponseStartEvent, HTTPResponseBodyEvent
 from speedy.types import (
     Scope,
     Receive,
@@ -23,7 +23,6 @@ from speedy.types import (
     Empty,
     Serializer,
 )
-from speedy.types.asgi_types import HTTPResponseStartEvent, HTTPResponseBodyEvent
 from speedy.types.composite_types import ResponseCookies, TypeEncodersMap
 from speedy.utils.helpers import get_enum_string_value
 
@@ -228,7 +227,7 @@ class Response(Generic[T]):
                 domain=domain,
                 secure=secure,
                 httponly=httponly,
-                samesite=samesite
+                samesite=samesite,
             )
         self.cookies.append(key)
 

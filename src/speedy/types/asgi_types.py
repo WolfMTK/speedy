@@ -27,7 +27,6 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
-from __future__ import annotations
 
 import sys
 from typing import (
@@ -38,20 +37,17 @@ from typing import (
     Any,
     Callable,
     Awaitable,
-    TYPE_CHECKING,
     TypeAlias,
 )
 
 from speedy.enums import HttpMethod, ScopeType
+from speedy.types.empty import EmptyType
+from speedy.types.internal_types import RouteHandlerType
 
 if sys.version_info >= (3, 11):
     from typing import NotRequired
 else:
     from typing_extensions import NotRequired
-
-if TYPE_CHECKING:
-    from speedy import Speedy
-    from speedy.types import EmptyType, RouteHandlerType
 
 HttpMethodName: TypeAlias = Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD", "TRACE", "OPTIONS"]
 Method: TypeAlias = Union[HttpMethodName, HttpMethod]
@@ -69,7 +65,7 @@ class ASGIVersion(TypedDict):
 class BaseScope(TypedDict):
     """ Base ASGI-scope. """
 
-    app: Speedy
+    app: "ASGIApp"
     asgi: ASGIVersion
     http_version: str
     scheme: str
@@ -103,7 +99,7 @@ class WebSocketScope(BaseScope):
 class LifespanScope(TypedDict):
     """ Lifespan-ASGI-scope. """
 
-    app: ASGIApplication  # type: ignore[valid-type]
+    app: "ASGIApp"
     type: Literal[ScopeType.LIFESPAN]
     asgi: ASGIVersion
     state: NotRequired[dict[str, Any]]
@@ -335,3 +331,7 @@ Send: TypeAlias = Callable[[Message], Awaitable[None]]
 LifeSpanReceive: TypeAlias = Callable[..., Awaitable[LifeSpanReceiveMessage]]
 
 LifeSpanSend: TypeAlias = Callable[[LifeSpanSendMessage], Awaitable[None]]
+
+ASGIApp = Callable[[Scope | LifespanScope,
+                    Receive | LifeSpanReceiveMessage,
+                    Send | LifeSpanSendMessage], Awaitable[None]]

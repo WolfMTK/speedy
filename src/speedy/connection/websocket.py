@@ -21,7 +21,7 @@ from speedy.types import (
     Message,
     WebSocketSendEvent, Serializer,
 )
-from speedy.types.asgi_types import WebSocketAcceptEvent, WebSocketCloseEvent
+from speedy.types import WebSocketAcceptEvent, WebSocketCloseEvent
 
 
 class WebSocketState(Enum):
@@ -192,7 +192,8 @@ class WebSocket(Generic[UserT, AuthT, StateT], ASGIConnection[WebsocketRouteHand
         # TODO: Add encoder for json.
         # await self.send_data()
 
-    async def send_msgpack(self,
+    async def send_msgpack(
+            self,
             data: Any,
             encoding: str = "utf-8",
             serializer: Serializer | None = None,

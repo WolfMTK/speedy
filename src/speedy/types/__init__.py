@@ -1,4 +1,4 @@
-from speedy.types.asgi_type import (
+from speedy.types.asgi_types import (
     ASGIApp,
     ASGIReceiveEvent,
     ASGIVersion,
