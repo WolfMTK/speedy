@@ -11,3 +11,10 @@ class HTTPMethod(str, Enum):
     DELETE = "DELETE"
     OPTIONS = "OPTIONS"
     TRACE = "TRACE"
+
+
+class ScopeType(str, Enum):
+    """An enum for the 'http' key stored under Scoped."""
+    HTTP = "http"
+    WEBSOCKET = "websocket"
+    LIFESPAN = "lifespan"
