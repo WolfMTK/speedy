@@ -58,3 +58,59 @@ class LifespanScope(TypedDict):
     type: Literal[ScopeType.LIFESPAN]
     asgi: ASGIVersion
     state: NotRequired[dict[str, Any]]
+
+
+type Scope = HTTPScope | WebSocketScope | LifespanScope
+
+
+class HTTPRequestEvent(TypedDict):
+    """ASGI `http.request` event."""
+    type: Literal["http.request"]
+    body: bytes
+    more_body: bool
+
+
+class HTTPResponseDebugEvent(TypedDict):
+    """ASGI `http.response.debug` event."""
+    type: Literal["http.response.debug"]
+    info: dict[str, object]
+
+
+class HTTPResponseStartEvent(TypedDict):
+    """ASGI `http.response.start` event."""
+    type: Literal["http.response.start"]
+    status: int
+    headers: Headers
+    trailers: bool
+
+
+class HTTPResponseBodyEvent(TypedDict):
+    """ASGI `http.response.body` event."""
+    type: Literal["http.response.body"]
+    body: bytes
+    more_body: bool
+
+
+class HTTPResponseTrailersEvent(TypedDict):
+    """ASGI `http.response.trailers` event."""
+    type: Literal["http.response.trailers"]
+    headers: Headers
+    more_trailers: bool
+
+
+class HTTPResponsePathsendEvent(TypedDict):
+    """ASGI `http.response.pathsend` event."""
+    type: Literal["http.response.pathsend"]
+    path: str
+
+
+class HTTPServerPushEvent(TypedDict):
+    """ASGI `http.response.push` event."""
+    type: Literal["http.response.push"]
+    path: str
+    headers: Headers
+
+
+class HTTPDisconnectEvent(TypedDict):
+    """ASGI `http.disconnect` event."""
+    type: Literal["http.disconnect"]
