@@ -114,3 +114,57 @@ class HTTPServerPushEvent(TypedDict):
 class HTTPDisconnectEvent(TypedDict):
     """ASGI `http.disconnect` event."""
     type: Literal["http.disconnect"]
+
+
+class WebSocketConnectEvent(TypedDict):
+    """ASGI `websocket.connect` event."""
+    type: Literal["websocket.connect"]
+
+
+class WebSocketAcceptEvent(TypedDict):
+    """ASGI `websocket.accept` event."""
+    type: Literal["websocket.accept"]
+    subprotocol: str | None
+    headers: Headers
+
+
+class WebSocketReceiveEvent(TypedDict):
+    """ASGI `websocket.receive` event."""
+    type: Literal["websocket.receive"]
+    bytes: bytes | None
+    text: str | None
+
+
+class WebSocketSendEvent(TypedDict):
+    """ASGI `websocket.send` event."""
+    type: Literal["websocket.send"]
+    bytes: bytes | None
+    text: str | None
+
+
+class WebSocketResponseStartEvent(TypedDict):
+    """ASGI `websocket.http.response.start` event."""
+    type: Literal["websocket.http.response.start"]
+    status: int
+    headers: Headers
+
+
+class WebSocketResponseBodyEvent(TypedDict):
+    """ASGI `websocket.http.response.body` event."""
+    type: Literal["websocket.http.response.body"]
+    body: bytes
+    more_body: bool
+
+
+class WebSocketDisconnectEvent(TypedDict):
+    """ASGI `websocket.disconnect` event."""
+    type: Literal["websocket.disconnect"]
+    code: int
+    reason: str | None
+
+
+class WebSocketCloseEvent(TypedDict):
+    """ASGI `websocket.close` event."""
+    type: Literal["websocket.close"]
+    code: int
+    reason: str | None
