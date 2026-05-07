@@ -1,4 +1,4 @@
-from typing import Literal, TypedDict, Iterable, NotRequired, Any
+from typing import Literal, TypedDict, Iterable, NotRequired, Any, Union, Callable, Awaitable
 
 from speedy.enums import HTTPMethod, ScopeType
 
@@ -6,9 +6,9 @@ type HTTPMethodName = Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD", "
 
 type Method = HTTPMethodName | HTTPMethod
 
-Version = Literal["2.0"] | Literal["3.0"]
+type Version = Literal["2.0"] | Literal["3.0"]
 
-Headers = Iterable[tuple[bytes, bytes]]
+type Headers = Iterable[tuple[bytes, bytes]]
 
 
 class ASGIVersion(TypedDict):
@@ -168,3 +168,67 @@ class WebSocketCloseEvent(TypedDict):
     type: Literal["websocket.close"]
     code: int
     reason: str | None
+
+
+class LifespanStartupEvent(TypedDict):
+    """ASGI `lifespan.startup` event."""
+    type: Literal["lifespan.startup"]
+
+
+class LifespanShutdownEvent(TypedDict):
+    """ASGI `lifespan.shutdown` event."""
+    type: Literal["lifespan.shutdown"]
+
+
+class LifespanStartupCompleteEvent(TypedDict):
+    """ASGI `lifespan.startup.complete` event."""
+    type: Literal["lifespan.startup.complete"]
+
+
+class LifespanStartupFailedEvent(TypedDict):
+    """ASGI `lifespan.startup.failed"` event."""
+    type: Literal["lifespan.startup.failed"]
+    message: str
+
+
+class LifespanShutdownCompleteEvent(TypedDict):
+    """ASGI `lifespan.shutdown.complete` event."""
+    type: Literal["lifespan.shutdown.complete"]
+
+
+class LifespanShutdownFailedEvent(TypedDict):
+    """ASGI `lifespan.shutdown.failed` event."""
+    type: Literal["lifespan.shutdown.failed"]
+    message: str
+
+
+type ReceiveMessage = Union[
+    HTTPRequestEvent,
+    HTTPDisconnectEvent,
+    WebSocketConnectEvent,
+    WebSocketReceiveEvent,
+    WebSocketDisconnectEvent,
+    LifespanStartupEvent,
+    LifespanShutdownEvent,
+]
+
+type Message = Union[
+    HTTPResponseStartEvent,
+    HTTPResponseBodyEvent,
+    HTTPResponseTrailersEvent,
+    HTTPServerPushEvent,
+    HTTPDisconnectEvent,
+    WebSocketAcceptEvent,
+    WebSocketSendEvent,
+    WebSocketResponseStartEvent,
+    WebSocketResponseBodyEvent,
+    WebSocketCloseEvent,
+    LifespanStartupCompleteEvent,
+    LifespanStartupFailedEvent,
+    LifespanShutdownCompleteEvent,
+    LifespanShutdownFailedEvent,
+]
+
+type Receive = Callable[[], Awaitable[ReceiveMessage]]
+
+type Send = Callable[[Message], Awaitable[None]]
