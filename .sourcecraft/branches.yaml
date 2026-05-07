@@ -1,0 +1,22 @@
+branch_protection:
+  policies:
+    - target: branch
+      matches: "main"
+      rules:
+        - prevent_force_push
+        - prevent_non_pr_changes
+        - prevent_deletion
+
+    - target: branch
+      matches: "dev"
+      rules:
+        - prevent_force_push
+        - prevent_non_pr_changes
+        - prevent_deletion
+
+    - target: branch
+      matches: "dev_2_0"
+      rules:
+        - prevent_force_push
+        - prevent_non_pr_changes
+        - prevent_deletion
