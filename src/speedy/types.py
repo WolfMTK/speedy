@@ -1,4 +1,4 @@
-from typing import Literal, TypedDict, Iterable, NotRequired, Any, Union
+from typing import Literal, TypedDict, Iterable, NotRequired, Any, Union, Callable, Awaitable
 
 from speedy.enums import HTTPMethod, ScopeType
 
@@ -202,7 +202,7 @@ class LifespanShutdownFailedEvent(TypedDict):
     message: str
 
 
-type ASGIReceiveEvent = Union[
+type ReceiveMessage = Union[
     HTTPRequestEvent,
     HTTPDisconnectEvent,
     WebSocketConnectEvent,
@@ -212,7 +212,7 @@ type ASGIReceiveEvent = Union[
     LifespanShutdownEvent,
 ]
 
-type ASGISendEvent = Union[
+type Message = Union[
     HTTPResponseStartEvent,
     HTTPResponseBodyEvent,
     HTTPResponseTrailersEvent,
@@ -228,3 +228,7 @@ type ASGISendEvent = Union[
     LifespanShutdownCompleteEvent,
     LifespanShutdownFailedEvent,
 ]
+
+type Receive = Callable[[], Awaitable[ReceiveMessage]]
+
+type Send = Callable[[Message], Awaitable[None]]
