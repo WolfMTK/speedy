@@ -1,4 +1,4 @@
-from typing import Literal, TypedDict, Iterable, NotRequired, Any
+from typing import Literal, TypedDict, Iterable, NotRequired, Any, Union
 
 from speedy.enums import HTTPMethod, ScopeType
 
@@ -6,9 +6,9 @@ type HTTPMethodName = Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD", "
 
 type Method = HTTPMethodName | HTTPMethod
 
-Version = Literal["2.0"] | Literal["3.0"]
+type Version = Literal["2.0"] | Literal["3.0"]
 
-Headers = Iterable[tuple[bytes, bytes]]
+type Headers = Iterable[tuple[bytes, bytes]]
 
 
 class ASGIVersion(TypedDict):
@@ -200,3 +200,31 @@ class LifespanShutdownFailedEvent(TypedDict):
     """ASGI `lifespan.shutdown.failed` event."""
     type: Literal["lifespan.shutdown.failed"]
     message: str
+
+
+type ASGIReceiveEvent = Union[
+    HTTPRequestEvent,
+    HTTPDisconnectEvent,
+    WebSocketConnectEvent,
+    WebSocketReceiveEvent,
+    WebSocketDisconnectEvent,
+    LifespanStartupEvent,
+    LifespanShutdownEvent,
+]
+
+type ASGISendEvent = Union[
+    HTTPResponseStartEvent,
+    HTTPResponseBodyEvent,
+    HTTPResponseTrailersEvent,
+    HTTPServerPushEvent,
+    HTTPDisconnectEvent,
+    WebSocketAcceptEvent,
+    WebSocketSendEvent,
+    WebSocketResponseStartEvent,
+    WebSocketResponseBodyEvent,
+    WebSocketCloseEvent,
+    LifespanStartupCompleteEvent,
+    LifespanStartupFailedEvent,
+    LifespanShutdownCompleteEvent,
+    LifespanShutdownFailedEvent,
+]
