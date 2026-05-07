@@ -168,3 +168,35 @@ class WebSocketCloseEvent(TypedDict):
     type: Literal["websocket.close"]
     code: int
     reason: str | None
+
+
+class LifespanStartupEvent(TypedDict):
+    """ASGI `lifespan.startup` event."""
+    type: Literal["lifespan.startup"]
+
+
+class LifespanShutdownEvent(TypedDict):
+    """ASGI `lifespan.shutdown` event."""
+    type: Literal["lifespan.shutdown"]
+
+
+class LifespanStartupCompleteEvent(TypedDict):
+    """ASGI `lifespan.startup.complete` event."""
+    type: Literal["lifespan.startup.complete"]
+
+
+class LifespanStartupFailedEvent(TypedDict):
+    """ASGI `lifespan.startup.failed"` event."""
+    type: Literal["lifespan.startup.failed"]
+    message: str
+
+
+class LifespanShutdownCompleteEvent(TypedDict):
+    """ASGI `lifespan.shutdown.complete` event."""
+    type: Literal["lifespan.shutdown.complete"]
+
+
+class LifespanShutdownFailedEvent(TypedDict):
+    """ASGI `lifespan.shutdown.failed` event."""
+    type: Literal["lifespan.shutdown.failed"]
+    message: str
