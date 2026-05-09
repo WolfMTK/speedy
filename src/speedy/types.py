@@ -232,3 +232,12 @@ type Message = Union[
 type Receive = Callable[[], Awaitable[ReceiveMessage]]
 
 type Send = Callable[[Message], Awaitable[None]]
+
+type ASGIApplication = Callable[
+    [
+        Scope,
+        Receive,
+        Send,
+    ],
+    Awaitable[None],
+]
