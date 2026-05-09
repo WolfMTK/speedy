@@ -8,7 +8,11 @@ type Method = HTTPMethodName | HTTPMethod
 
 type Version = Literal["2.0"] | Literal["3.0"]
 
-type Headers = Iterable[tuple[bytes, bytes]]
+type HeadersT = Iterable[tuple[bytes, bytes]]
+
+type ClientT = tuple[str, int] | None
+
+type ServerT = tuple[str, int | None] | None
 
 
 class ASGIVersion(TypedDict):
@@ -17,40 +21,32 @@ class ASGIVersion(TypedDict):
     version: Version
 
 
-class HTTPScope(TypedDict):
+class BaseScope(TypedDict):
+    """Base scope."""
+    asgi: ASGIVersion
+    http_version: str
+    scheme: str
+    path: str
+    raw_path: bytes
+    query_string: bytes
+    root_path: str
+    headers: HeadersT
+    client: ClientT
+    server: ServerT
+    state: NotRequired[dict[str, Any]]
+    extensions: NotRequired[dict[str, dict[object, object]]]
+
+
+class HTTPScope(BaseScope):
     """HTTP-ASGI scope."""
     type: Literal[ScopeType.HTTP]
-    asgi: ASGIVersion
-    http_version: str
     method: str | Method
-    scheme: str
-    path: str
-    raw_path: bytes
-    query_string: bytes
-    root_path: str
-    headers: Headers
-    client: tuple[str, int] | None
-    server: tuple[str, int | None] | None
-    state: NotRequired[dict[str, Any,]]
-    extensions: NotRequired[dict[str, dict[object, object]]]
 
 
-class WebSocketScope(TypedDict):
+class WebSocketScope(BaseScope):
     """WebSocket-ASGI scope."""
     type: Literal[ScopeType.WEBSOCKET]
-    asgi: ASGIVersion
-    http_version: str
-    scheme: str
-    path: str
-    raw_path: bytes
-    query_string: bytes
-    root_path: str
-    headers: Headers
-    client: tuple[str, int] | None
-    server: tuple[str, int | None] | None
     subprotocols: Iterable[str]
-    state: NotRequired[dict[str, Any,]]
-    extensions: NotRequired[dict[str, dict[object, object]]]
 
 
 class LifespanScope(TypedDict):
@@ -80,7 +76,7 @@ class HTTPResponseStartEvent(TypedDict):
     """ASGI `http.response.start` event."""
     type: Literal["http.response.start"]
     status: int
-    headers: Headers
+    headers: HeadersT
     trailers: bool
 
 
@@ -94,7 +90,7 @@ class HTTPResponseBodyEvent(TypedDict):
 class HTTPResponseTrailersEvent(TypedDict):
     """ASGI `http.response.trailers` event."""
     type: Literal["http.response.trailers"]
-    headers: Headers
+    headers: HeadersT
     more_trailers: bool
 
 
@@ -108,7 +104,7 @@ class HTTPServerPushEvent(TypedDict):
     """ASGI `http.response.push` event."""
     type: Literal["http.response.push"]
     path: str
-    headers: Headers
+    headers: HeadersT
 
 
 class HTTPDisconnectEvent(TypedDict):
@@ -125,7 +121,7 @@ class WebSocketAcceptEvent(TypedDict):
     """ASGI `websocket.accept` event."""
     type: Literal["websocket.accept"]
     subprotocol: str | None
-    headers: Headers
+    headers: HeadersT
 
 
 class WebSocketReceiveEvent(TypedDict):
@@ -146,7 +142,7 @@ class WebSocketResponseStartEvent(TypedDict):
     """ASGI `websocket.http.response.start` event."""
     type: Literal["websocket.http.response.start"]
     status: int
-    headers: Headers
+    headers: HeadersT
 
 
 class WebSocketResponseBodyEvent(TypedDict):
