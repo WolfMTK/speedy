@@ -1,7 +1,11 @@
+from speedy.types import Scope, Receive, Send
+
+
 class Speedy:
     def __init__(self) -> None: ...
 
-    def __call__(self) -> None: ...
+    def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        scope["app"] = self
 
     def get(self) -> None:
         # TODO: add decoration HTTPHandler
@@ -33,4 +37,16 @@ class Speedy:
 
     def trace(self) -> None:
         # TODO: add decoration HTTPHandler
+        ...
+
+    def websocket(self) -> None:
+        # TODO: add decoration WebSocket
+        ...
+
+    def exception_handler(self) -> None:
+        # TODO: add decoration ExceptionHandler
+        ...
+
+    def middleware(self) -> None:
+        # TODO: add decoration Middleware
         ...
