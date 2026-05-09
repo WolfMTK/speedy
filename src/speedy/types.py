@@ -23,6 +23,7 @@ class ASGIVersion(TypedDict):
 
 class BaseScope(TypedDict):
     """Base scope."""
+    app: "ASGIApplication"
     asgi: ASGIVersion
     http_version: str
     scheme: str
