@@ -5,8 +5,8 @@ on:
     branches:
       - "main"
       - "master"
-# TODO: Uncomment after the application has been created
       - "dev"
+      - "dev_2_0"
       - "develop"
   pull_request:
     branches:
