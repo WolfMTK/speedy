@@ -1,12 +1,9 @@
 from abc import ABC
-from typing import TypeVar, Generic
 
 from speedy.types import Receive, Send, BaseScope
 
-ScopeT = TypeVar("ScopeT", bound=BaseScope)
 
-
-class BaseRoute(ABC, Generic[ScopeT]):
+class BaseRoute[ScopeT: BaseScope](ABC):
     """Base Route class."""
 
     async def handle(
