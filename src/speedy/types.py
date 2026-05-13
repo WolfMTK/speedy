@@ -1,6 +1,7 @@
-from typing import Literal, TypedDict, Iterable, NotRequired, Any, Union, Callable, Awaitable
+from typing import Literal, TypedDict, Iterable, NotRequired, Any, Union, Callable, Awaitable, MutableMapping
 
 from speedy.enums import HTTPMethod, ScopeType
+from speedy.protocols import IRequest, IResponse
 
 type HTTPMethodName = Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD", "TRACE", "OPTIONS"]
 
@@ -240,3 +241,7 @@ type ASGIApplication = Callable[
 ]
 
 type Middleware = Callable[..., ASGIApplication]
+
+type HTTPExceptionHandler = Callable[[IRequest, Exception], IResponse]
+
+type ExceptionHandlersMap = MutableMapping[int | type[Exception], HTTPExceptionHandler]
