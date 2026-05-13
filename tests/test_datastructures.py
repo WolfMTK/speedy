@@ -22,7 +22,6 @@ class _CustomMapping(Mapping):
 
 
 class TestImmutableState:
-
     @pytest.mark.parametrize(
         "input_data, expected_dict",
         [
@@ -141,7 +140,6 @@ class TestImmutableState:
 
 
 class TestState:
-
     def test_init_default(self) -> None:
         state = State()
         assert dict(state) == {}
@@ -192,7 +190,7 @@ class TestState:
         assert state.a == 1
         assert state.b == {"c": 2}
         with pytest.raises(AttributeError, match="missing"):
-            _ =state.missing
+            _ = state.missing
 
     def test_getattr_slots_priority(self) -> None:
         state = State({"_data": "val"})
