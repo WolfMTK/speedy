@@ -238,3 +238,5 @@ type ASGIApplication = Callable[
     ],
     Awaitable[None],
 ]
+
+type Middleware = Callable[..., ASGIApplication]
