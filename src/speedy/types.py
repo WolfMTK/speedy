@@ -1,4 +1,5 @@
-from typing import Literal, TypedDict, Iterable, NotRequired, Any, Union, Callable, Awaitable, MutableMapping
+from contextlib import AbstractAsyncContextManager
+from typing import Literal, TypedDict, Iterable, NotRequired, Any, Union, Callable, Awaitable, MutableMapping, Sequence
 
 from speedy.enums import HTTPMethod, ScopeType
 from speedy.protocols import IRequest, IResponse
@@ -245,3 +246,5 @@ type Middleware = Callable[..., ASGIApplication]
 type HTTPExceptionHandler = Callable[[IRequest, Exception], IResponse]
 
 type ExceptionHandlersMap = MutableMapping[int | type[Exception], HTTPExceptionHandler]
+
+type Lifespan = Sequence[Callable[[ASGIApplication], AbstractAsyncContextManager] | AbstractAsyncContextManager]
