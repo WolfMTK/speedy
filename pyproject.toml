@@ -23,7 +23,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "anyio>=4.14.0",
+    "anyio>=4.14.1",
     "covdefaults>=2.3.0",
     "typing-extensions",
 ]
@@ -34,12 +34,12 @@ dev = [
     "httpx<=0.28.1",
     "pytest-cov",
     "pytest-asyncio<=1.4.0",
-    "tox>=4.55.1",
+    "tox>=4.56.1",
     "trio<=0.33.0",
 ]
 
 [tool.tox]
-requires = ["tox>=4.55.1", "tox-uv>=0.11.0"]
+requires = ["tox>=4.56.1", "tox-uv>=0.11.0"]
 env_list = ["3.12", "3.13", "3.14"]
 
 [tool.tox.env_run_base]
