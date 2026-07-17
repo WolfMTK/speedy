@@ -23,7 +23,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "anyio>=4.14.1",
+    "anyio>=4.14.2",
     "covdefaults>=2.3.0",
     "typing-extensions",
 ]
