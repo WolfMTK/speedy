@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin>=1.12,<2.0"]
+requires = ["maturin>=1.15.0,<2.0"]
 build-backend = "maturin"
 
 [project]
@@ -37,7 +37,7 @@ dev = [
     "httpx<=0.28.1",
     "pytest-cov",
     "pytest-asyncio<=1.4.0",
-    "tox>=4.60.0",
+    "tox>=4.61.2",
     "trio<=0.34.0",
 ]
 
@@ -46,7 +46,7 @@ python-source = "python"
 module-name = "speedy._speedy"
 
 [tool.tox]
-requires = ["tox>=4.60.0", "tox-uv>=0.11.0"]
+requires = ["tox>=4.61.2", "tox-uv>=0.11.0"]
 env_list = ["3.12", "3.13", "3.14"]
 
 [tool.tox.env_run_base]
