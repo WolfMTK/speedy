@@ -1,0 +1,11 @@
+[package]
+name = "speedy"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "speedy"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = "0.29.2"
