@@ -8,4 +8,5 @@ name = "speedy"
 crate-type = ["cdylib"]
 
 [dependencies]
+indexmap = "2.14.1"
 pyo3 = "0.29.2"
