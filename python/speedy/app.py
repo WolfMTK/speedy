@@ -1,4 +1,4 @@
-from speedy.types import Scope, Receive, Send
+from speedy.types import Receive, Scope, Send
 
 
 class Speedy:

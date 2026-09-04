@@ -1,8 +1,9 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class HTTPMethod(str, Enum):
+class HTTPMethod(str, StrEnum):
     """An enum for HTTP methods."""
+
     GET = "GET"
     HEAD = "HEAD"
     POST = "POST"
@@ -13,8 +14,9 @@ class HTTPMethod(str, Enum):
     TRACE = "TRACE"
 
 
-class ScopeType(str, Enum):
+class ScopeType(str, StrEnum):
     """An enum for the 'http' key stored under Scoped."""
+
     HTTP = "http"
     WEBSOCKET = "websocket"
     LIFESPAN = "lifespan"
