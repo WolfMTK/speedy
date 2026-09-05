@@ -5,7 +5,7 @@ from typing import Any, Iterator, Mapping
 
 import pytest
 
-from speedy.datastructures import Address, ImmutableState, State
+from speedy.datastructures import URL, Address, ImmutableState, State, URLPath
 from speedy.exceptions import StateException
 
 
@@ -295,7 +295,7 @@ class TestAddress:
 
     def test_repr_quotes_host_like_python_repr(self) -> None:
         addr = Address("it's-a-host", 80)
-        assert repr(addr) == "Address(host=\"it's-a-host\", port=80)"
+        assert repr(addr) == 'Address(host="it\'s-a-host", port=80)'
 
     def test_len_is_always_two(self) -> None:
         assert len(Address("h", 1)) == 2
@@ -471,3 +471,133 @@ class TestAddress:
     def test_incomparable_type_raises_naming_address_not_tuple(self) -> None:
         with pytest.raises(TypeError, match="Address"):
             Address("127.0.0.1", 8000) < 42
+
+
+class TestURL:
+    def _check_url(self, url: URL) -> None:
+        assert url.scheme == "https"
+        assert url.hostname == "example.org"
+        assert url.port == 8000
+        assert url.netloc == "example.org:8000"
+        assert url.username is None
+        assert url.password is None
+        assert url.path == "/path/to/somewhere"
+        assert url.query == "abc=123"
+        assert url.fragment == "anchor"
+
+    def test_url(self) -> None:
+        url = URL("https://example.org:8000/path/to/somewhere?abc=123#anchor")
+        self._check_url(url)
+
+        url_path = URLPath("/path/to/somewhere?abc=123#anchor", "https://example.org:8000")
+        url = URL(url_path)
+        self._check_url(url)
+
+    def test_replace(self) -> None:
+        url = URL("https://example.org:8000/path/to/somewhere?abc=123#anchor")
+        new_url = url.replace(scheme="http")
+        assert new_url == "http://example.org:8000/path/to/somewhere?abc=123#anchor"
+        assert new_url.scheme == "http"
+
+        new_url = url.replace(port=None)
+        assert new_url == "https://example.org/path/to/somewhere?abc=123#anchor"
+        assert new_url.port is None
+
+        new_url = url.replace(hostname="example.com")
+        assert new_url == "https://example.com:8000/path/to/somewhere?abc=123#anchor"
+        assert new_url.hostname == "example.com"
+
+        ipv6_url = URL("https://[fe::2]:12345")
+        new_ipv6_url = ipv6_url.replace(port=8000)
+        assert new_ipv6_url == "https://[fe::2]:8000"
+        assert new_ipv6_url.port == 8000
+
+        new_ipv6_url = ipv6_url.replace(username="username", password="password")
+        assert new_ipv6_url == "https://username:password@[fe::2]:12345"
+        assert new_ipv6_url.netloc == "username:password@[fe::2]:12345"
+        assert new_ipv6_url.username == "username"
+        assert new_ipv6_url.password == "password"
+
+        ipv6_url = URL("https://[fe::2]")
+        new_ipv6_url = ipv6_url.replace(port=8000)
+        assert new_ipv6_url == "https://[fe::2]:8000"
+        assert new_ipv6_url.port == 8000
+
+        url = URL("http://u:p@host/")
+        new_url = url.replace(hostname="foo")
+        assert new_url == "http://u:p@foo/"
+        assert new_url.hostname == "foo"
+
+        url = URL("http://host:80")
+        new_url = url.replace(username="user")
+        assert new_url == "http://user@host:80"
+
+    def test_url_eq(self) -> None:
+        assert URL("") == URL("")
+        assert URL("/foo") == "/foo"
+        assert URL("") != 1
+
+    def test_url_repr(self) -> None:
+        url = URL("https://example.org:8000/path/to/somewhere?abc=123#anchor")
+        assert repr(url) == "URL('https://example.org:8000/path/to/somewhere?abc=123#anchor')"
+
+    def test_url_replace_query_params(self) -> None:
+        url = URL("https://example.org:8000/path/to/somewhere?abc=123#anchor")
+        assert url.query == "abc=123"
+        url = url.replace_query_params(order="name")
+        assert url == "https://example.org:8000/path/to/somewhere?order=name#anchor"
+        assert url.query == "order=name"
+
+    def test_url_remove_query_params(self) -> None:
+        url = URL("https://example.org/path/to?a=1&b=2")
+        assert url.query == "a=1&b=2"
+        url = url.remove_query_params("a")
+        assert url == "https://example.org/path/to?b=2"
+        assert url.query == "b=2"
+        url = URL("https://example.org/path/to?a=1&b=2&c=3")
+        url = url.remove_query_params(("a", "b", "c"))
+        assert url == "https://example.org/path/to"
+        assert url.query == ""
+
+    def test_url_include_query_params(self) -> None:
+        url = URL("https://example.org/path/to?a=1")
+        assert url.query == "a=1"
+        url = url.include_query_params(a=2)
+        assert url.query == "a=2"
+        assert url == "https://example.org/path/to?a=2"
+        url = url.include_query_params(search="test")
+        assert url.query == "a=2&search=test"
+        assert url == "https://example.org/path/to?a=2&search=test"
+
+    def test_hidden_password(self) -> None:
+        url = URL("https://example.org/path/to?a=1")
+        assert repr(url) == "URL('https://example.org/path/to?a=1')"
+        url = URL("https://username@example.org/path/to?a=1")
+        assert repr(url) == "URL('https://username@example.org/path/to?a=1')"
+        url = URL("https://username:password@example.org/path/to?a=1")
+        assert repr(url) == "URL('https://username:**********@example.org/path/to?a=1')"
+
+
+class TestURLPath:
+    @pytest.mark.parametrize(
+        'base, path', [
+            ('http://example.org', 'foo/bar?a=1&b=2'),
+            ('http://example.org/', 'foo/bar?a=1&b=2'),
+            ('http://example.org', '/foo/bar?a=1&b=2'),
+            ('http://example.org', '/foo/bar?a=1&b=2')
+        ]
+    )
+    def test_url_path(self, base: str, path: str) -> None:
+        result = 'http://example.org/foo/bar?a=1&b=2'
+        assert str(URLPath(path, base)) == result
+
+    @pytest.mark.parametrize(
+        'base, path', [
+            ('http://example.org', 'foo/bar?a=1&b=2'),
+            ('http://example.org/', 'foo/bar?a=1&b=2'),
+            ('http://example.org', '/foo/bar?a=1&b=2'),
+            ('http://example.org', '/foo/bar?a=1&b=2')
+        ]
+    )
+    def test_url_path_repr(self, base: str, path: str) -> None:
+        assert repr(URLPath(path, base)) == f"URLPath(path={path!r}, base={base!r})"
