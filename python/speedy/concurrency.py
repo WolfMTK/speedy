@@ -1,7 +1,14 @@
 import functools
-from typing import Callable, Iterator, AsyncIterator, Iterable
+import sys
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Iterator
+from typing import Any, TypeGuard
 
 import anyio.to_thread
+
+if sys.version_info >= (3, 13):
+    from inspect import iscoroutinefunction
+else:
+    from asyncio import iscoroutinefunction
 
 
 async def run_in_threadpool[**P, T](func: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
@@ -30,3 +37,25 @@ async def iterate_in_threadpool[T](
             yield item
         if exhausted:
             break
+
+
+def is_async_callable[**P, T](obj: Callable[P, T]) -> TypeGuard[Callable[P, Awaitable[T]]]:
+    obj = unwrap_partial(obj)
+
+    return iscoroutinefunction(obj) or (callable(obj) and iscoroutinefunction(obj.__call__))
+
+
+def unwrap_partial(value: Callable[..., Any]) -> Callable[..., Any]:
+    if isinstance(value, functools.partial):
+        return value.func
+    if isinstance(value, AsyncCallable):
+        return value.function
+    return value
+
+
+class AsyncCallable[**P, T]:
+    def __init__(self, function: Callable[P, T]) -> None:
+        self.function = function
+
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> Awaitable[T]:
+        return run_in_threadpool(self.function, *args, **kwargs)
