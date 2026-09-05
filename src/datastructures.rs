@@ -5,6 +5,8 @@ use indexmap::IndexMap;
 use pyo3::exceptions::{PyAttributeError, PyKeyError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyList, PyString, PyTuple, PyType};
+use uriparse::Authority;
+use url::form_urlencoded;
 
 type Key = Arc<str>;
 
@@ -19,15 +21,9 @@ fn state_exception(py: Python<'_>, message: String) -> PyErr {
     }
 }
 
-fn deepcopy_pydict<'py>(
-    py: Python<'py>,
-    dict: &Bound<'py, PyDict>,
-) -> PyResult<Bound<'py, PyDict>> {
+fn deepcopy_pydict<'py>(py: Python<'py>, dict: &Bound<'py, PyDict>) -> PyResult<Bound<'py, PyDict>> {
     let deepcopy = py.import("copy")?.getattr("deepcopy")?;
-    deepcopy
-        .call1((dict,))?
-        .cast_into::<PyDict>()
-        .map_err(Into::into)
+    deepcopy.call1((dict,))?.cast_into::<PyDict>().map_err(Into::into)
 }
 
 fn index_map_from_pydict(dict: &Bound<'_, PyDict>) -> PyResult<IndexMap<Key, Py<PyAny>>> {
@@ -36,10 +32,7 @@ fn index_map_from_pydict(dict: &Bound<'_, PyDict>) -> PyResult<IndexMap<Key, Py<
         .collect()
 }
 
-fn pydict_from_index_map<'py>(
-    py: Python<'py>,
-    map: &IndexMap<Key, Py<PyAny>>,
-) -> Bound<'py, PyDict> {
+fn pydict_from_index_map<'py>(py: Python<'py>, map: &IndexMap<Key, Py<PyAny>>) -> Bound<'py, PyDict> {
     let dict = PyDict::new(py);
     map.iter().for_each(|(k, v)| {
         dict.set_item(k.as_ref(), v.clone_ref(py))
@@ -48,11 +41,7 @@ fn pydict_from_index_map<'py>(
     dict
 }
 
-fn coerce_state(
-    py: Python<'_>,
-    state: &Bound<'_, PyAny>,
-    copy_data: bool,
-) -> PyResult<IndexMap<Key, Py<PyAny>>> {
+fn coerce_state(py: Python<'_>, state: &Bound<'_, PyAny>, copy_data: bool) -> PyResult<IndexMap<Key, Py<PyAny>>> {
     if let Ok(existing) = state.extract::<PyRef<'_, ImmutableState>>() {
         return if copy_data {
             let deep = deepcopy_pydict(py, &pydict_from_index_map(py, &existing.data))?;
@@ -70,17 +59,12 @@ fn coerce_state(
         d.clone()
     } else {
         let abc = py.import("collections.abc")?;
-        let is_mapping_or_iterable = state.is_instance(&abc.getattr("Mapping")?)?
-            || state.is_instance(&abc.getattr("Iterable")?)?;
+        let is_mapping_or_iterable =
+            state.is_instance(&abc.getattr("Mapping")?)? || state.is_instance(&abc.getattr("Iterable")?)?;
         if !is_mapping_or_iterable {
-            return Err(state_exception(
-                py,
-                format!("Invalid state type: {}", state.get_type()),
-            ));
+            return Err(state_exception(py, format!("Invalid state type: {}", state.get_type())));
         }
-        py.get_type::<PyDict>()
-            .call1((state,))?
-            .cast_into::<PyDict>()?
+        py.get_type::<PyDict>().call1((state,))?.cast_into::<PyDict>()?
     };
 
     let final_dict = if copy_data {
@@ -120,11 +104,6 @@ impl ImmutableState {
             .ok_or_else(|| PyAttributeError::new_err(format!("Attribute `{key}` not found")))
     }
 
-    #[getter(_data)]
-    fn get_data(&self, py: Python<'_>) -> Py<PyDict> {
-        pydict_from_index_map(py, &self.data).unbind()
-    }
-
     fn __iter__(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let keys: Vec<&str> = self.data.keys().map(|k| k.as_ref()).collect();
         let list = PyList::new(py, keys)?;
@@ -135,11 +114,6 @@ impl ImmutableState {
         self.data.len()
     }
 
-    fn keys(&self, py: Python<'_>) -> PyResult<Py<PyList>> {
-        let keys: Vec<&str> = self.data.keys().map(|k| k.as_ref()).collect();
-        Ok(PyList::new(py, keys)?.unbind())
-    }
-
     fn __repr__(slf: &Bound<'_, Self>) -> PyResult<String> {
         let py = slf.py();
         let class_name: String = slf.get_type().getattr("__name__")?.extract()?;
@@ -148,18 +122,15 @@ impl ImmutableState {
     }
 
     fn __eq__(&self, py: Python<'_>, other: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-        let b: Bound<'_, PyDict> =
-            if let Ok(other_state) = other.extract::<PyRef<'_, ImmutableState>>() {
-                pydict_from_index_map(py, &other_state.data)
-            } else {
-                let mapping_abc = py.import("collections.abc")?.getattr("Mapping")?;
-                if !other.is_instance(&mapping_abc)? {
-                    return Ok(PyBool::new(py, false).to_owned().into_any().unbind());
-                }
-                py.get_type::<PyDict>()
-                    .call1((other,))?
-                    .cast_into::<PyDict>()?
-            };
+        let b: Bound<'_, PyDict> = if let Ok(other_state) = other.extract::<PyRef<'_, ImmutableState>>() {
+            pydict_from_index_map(py, &other_state.data)
+        } else {
+            let mapping_abc = py.import("collections.abc")?.getattr("Mapping")?;
+            if !other.is_instance(&mapping_abc)? {
+                return Ok(PyBool::new(py, false).to_owned().into_any().unbind());
+            }
+            py.get_type::<PyDict>().call1((other,))?.cast_into::<PyDict>()?
+        };
 
         let a = pydict_from_index_map(py, &self.data);
         let equal = a.eq(&b)?;
@@ -171,6 +142,16 @@ impl ImmutableState {
         let data_dict = pydict_from_index_map(py, &slf.borrow().data);
         let cls = slf.get_type();
         Ok(cls.call1((data_dict, false))?.unbind())
+    }
+
+    #[getter(_data)]
+    fn get_data(&self, py: Python<'_>) -> Py<PyDict> {
+        pydict_from_index_map(py, &self.data).unbind()
+    }
+
+    fn keys(&self, py: Python<'_>) -> PyResult<Py<PyList>> {
+        let keys: Vec<&str> = self.data.keys().map(|k| k.as_ref()).collect();
+        Ok(PyList::new(py, keys)?.unbind())
     }
 
     fn as_dict(&self, py: Python<'_>) -> Py<PyDict> {
@@ -192,11 +173,7 @@ pub struct State {}
 impl State {
     #[new]
     #[pyo3(signature = (state=None, copy_data=true))]
-    fn new(
-        py: Python<'_>,
-        state: Option<&Bound<'_, PyAny>>,
-        copy_data: bool,
-    ) -> PyResult<PyClassInitializer<State>> {
+    fn new(py: Python<'_>, state: Option<&Bound<'_, PyAny>>, copy_data: bool) -> PyResult<PyClassInitializer<State>> {
         let empty_holder;
         let state_ref: &Bound<'_, PyAny> = match state {
             Some(s) => s,
@@ -277,12 +254,7 @@ impl Address {
         )
     }
 
-    fn rich_compare(
-        &self,
-        py: Python<'_>,
-        other: &Bound<'_, PyAny>,
-        op: &str,
-    ) -> PyResult<Py<PyAny>> {
+    fn rich_compare(&self, py: Python<'_>, other: &Bound<'_, PyAny>, op: &str) -> PyResult<Py<PyAny>> {
         let self_tuple = self.as_tuple(py)?;
         let other_obj = if let Ok(other_addr) = other.extract::<PyRef<'_, Address>>() {
             other_addr.as_tuple(py)?.into_any()
@@ -314,11 +286,7 @@ impl Address {
     }
 
     fn __iter__(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        Ok(self
-            .as_tuple(py)?
-            .as_any()
-            .call_method0("__iter__")?
-            .unbind())
+        Ok(self.as_tuple(py)?.as_any().call_method0("__iter__")?.unbind())
     }
 
     fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
@@ -355,21 +323,17 @@ impl Address {
         hasher.finish()
     }
 
+    #[pyo3(signature = (**kwargs))]
+    fn __replace__(&self, py: Python<'_>, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Py<PyAny>> {
+        self._replace(py, kwargs)
+    }
+
     fn count(&self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<usize> {
-        self.as_tuple(py)?
-            .as_any()
-            .call_method1("count", (value,))?
-            .extract()
+        self.as_tuple(py)?.as_any().call_method1("count", (value,))?.extract()
     }
 
     #[pyo3(signature = (value, start=0, stop=isize::MAX))]
-    fn index(
-        &self,
-        py: Python<'_>,
-        value: &Bound<'_, PyAny>,
-        start: isize,
-        stop: isize,
-    ) -> PyResult<usize> {
+    fn index(&self, py: Python<'_>, value: &Bound<'_, PyAny>, start: isize, stop: isize) -> PyResult<usize> {
         self.as_tuple(py)?
             .as_any()
             .call_method1("index", (value, start, stop))?
@@ -396,10 +360,7 @@ impl Address {
     #[classmethod]
     fn _make(cls: &Bound<'_, PyType>, iterable: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let py = cls.py();
-        let args = py
-            .get_type::<PyTuple>()
-            .call1((iterable,))?
-            .cast_into::<PyTuple>()?;
+        let args = py.get_type::<PyTuple>().call1((iterable,))?.cast_into::<PyTuple>()?;
         Ok(cls.call1(args)?.unbind())
     }
 
@@ -429,20 +390,453 @@ impl Address {
                 .map(|k| format!("'{k}'"))
                 .collect::<Vec<_>>()
                 .join(", ");
-            return Err(PyTypeError::new_err(format!(
-                "Got unexpected field names: [{joined}]"
-            )));
+            return Err(PyTypeError::new_err(format!("Got unexpected field names: [{joined}]")));
         }
 
         Ok(Py::new(py, Address { host, port })?.into_any())
     }
+}
+
+fn split_url(raw: &str) -> URL {
+    let mut rest = raw;
+
+    let fragment = if let Some(idx) = rest.find("#") {
+        let fragment = rest[idx + 1..].to_string();
+        rest = &rest[..idx];
+        fragment
+    } else {
+        String::new()
+    };
+
+    let query = if let Some(idx) = rest.find("?") {
+        let query = rest[idx + 1..].to_string();
+        rest = &rest[..idx];
+        query
+    } else {
+        String::new()
+    };
+
+    let (scheme, after_scheme) = split_scheme(rest);
+    rest = after_scheme;
+
+    let netloc = if let Some(stripped) = rest.strip_prefix("//") {
+        let end = stripped.find("/").unwrap_or(stripped.len());
+        let netloc = stripped[..end].to_string();
+        rest = &stripped[end..];
+        netloc
+    } else {
+        String::new()
+    };
+
+    URL {
+        scheme,
+        netloc,
+        path: rest.to_string(),
+        query,
+        fragment,
+    }
+}
+
+fn split_scheme(scheme: &str) -> (String, &str) {
+    if let Some(colon_idx) = scheme.find(":") {
+        let candidate = &scheme[..colon_idx];
+        if !candidate.is_empty() && candidate.chars().enumerate().all(|(i, c)| is_scheme_char(c, i == 0)) {
+            return (candidate.to_lowercase(), &scheme[colon_idx + 1..]);
+        }
+    }
+    (String::new(), scheme)
+}
+
+fn is_scheme_char(c: char, first: bool) -> bool {
+    if first {
+        c.is_ascii_alphabetic()
+    } else {
+        c.is_ascii_alphanumeric() || c == '+' || c == '-' || c == '.'
+    }
+}
+
+fn parse_authority(netloc: &str) -> Option<Authority<'static>> {
+    if netloc.is_empty() {
+        return None;
+    }
+    Authority::try_from(netloc).ok().map(|auth| auth.into_owned())
+}
+
+fn unsplit_url(scheme: &str, netloc: &str, path: &str, query: &str, fragment: &str) -> String {
+    let mut result = String::new();
+    if !scheme.is_empty() {
+        result.push_str(scheme);
+        result.push(':');
+    }
+    if !netloc.is_empty() || !scheme.is_empty() {
+        result.push_str("//");
+        result.push_str(netloc);
+    }
+    result.push_str(path);
+    if !query.is_empty() {
+        result.push('?');
+        result.push_str(query);
+    }
+    if !fragment.is_empty() {
+        result.push('#');
+        result.push_str(fragment);
+    }
+    result
+}
+
+fn build_netloc(
+    current_netloc: &str,
+    hostname: Option<String>,
+    port: Option<Option<u16>>,
+    username: Option<Option<String>>,
+    password: Option<Option<String>>,
+) -> String {
+    let host = hostname.unwrap_or_else(|| host_for_netloc_rebuild(current_netloc));
+
+    let port_resolved = match port {
+        Some(explicit) => explicit,
+        None => port_from_netloc(current_netloc),
+    };
+    let username_resolved = match username {
+        Some(explicit) => explicit,
+        None => username_from_netloc(current_netloc),
+    };
+    let password_resolved = match password {
+        Some(explicit) => explicit,
+        None => password_from_netloc(current_netloc),
+    };
+
+    let mut netloc = host;
+    if let Some(p) = port_resolved {
+        netloc.push(':');
+        netloc.push_str(&p.to_string());
+    }
+    if let Some(user) = username_resolved {
+        let mut userpass = user;
+        if let Some(pass) = password_resolved {
+            userpass.push(':');
+            userpass.push_str(&pass);
+        }
+        netloc = format!("{userpass}@{netloc}");
+    }
+    netloc
+}
+
+fn host_for_netloc_rebuild(netloc: &str) -> String {
+    let after_at = netloc.rsplit_once("@").map(|(_, h)| h).unwrap_or(netloc);
+    if after_at.ends_with("]") {
+        after_at.to_string()
+    } else {
+        after_at
+            .rsplit_once(":")
+            .map(|(h, _)| h)
+            .unwrap_or(after_at)
+            .to_string()
+    }
+}
+
+fn port_from_netloc(netloc: &str) -> Option<u16> {
+    parse_authority(netloc)?.port()
+}
+
+fn username_from_netloc(netloc: &str) -> Option<String> {
+    parse_authority(netloc)?.username().map(|u| u.to_string())
+}
+
+fn password_from_netloc(netloc: &str) -> Option<String> {
+    parse_authority(netloc)?.password().map(|p| p.to_string())
+}
+
+fn encode_pairs(pairs: &[(String, String)]) -> String {
+    form_urlencoded::Serializer::new(String::new())
+        .extend_pairs(pairs)
+        .finish()
+}
+
+fn extract_query_pairs(url: &URL, kwargs: &Bound<'_, PyDict>) -> PyResult<Vec<(String, String)>> {
+    let initial: Vec<(String, String)> = form_urlencoded::parse(url.query.as_bytes())
+        .map(|(k, v)| (k.into_owned(), v.into_owned()))
+        .collect();
+    kwargs
+        .iter()
+        .try_fold(initial, |mut pairs, (key, value)| -> PyResult<_> {
+            let key_str: String = key.extract()?;
+            let value_str: String = value.str()?.extract()?;
+            pairs.retain(|(k, _)| k != &key_str);
+            pairs.push((key_str, value_str));
+            Ok(pairs)
+        })
+}
+
+#[pyclass(module = "speedy.datastructures", skip_from_py_object)]
+#[derive(Clone)]
+pub struct URL {
+    scheme: String,
+    netloc: String,
+    path: String,
+    query: String,
+    fragment: String,
+}
+
+impl URL {
+    fn with_password(&self, new_password: &str) -> URL {
+        let netloc = build_netloc(&self.netloc, None, None, None, Some(Some(new_password.to_string())));
+        URL {
+            scheme: self.scheme.clone(),
+            netloc,
+            path: self.path.clone(),
+            query: self.query.clone(),
+            fragment: self.fragment.clone(),
+        }
+    }
+}
+
+#[pymethods]
+impl URL {
+    #[new]
+    #[pyo3(signature = (url=None))]
+    fn new(url: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
+        let raw: String = match url {
+            None => String::new(),
+            Some(obj) => obj.str()?.extract::<String>()?,
+        };
+        let url = split_url(&raw);
+        Ok(url)
+    }
+
+    fn __eq__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
+        if let Ok(other_url) = other.extract::<PyRef<'_, URL>>() {
+            return Ok(self.__str__() == other_url.__str__());
+        }
+        if let Ok(other_str) = other.extract::<String>() {
+            return Ok(self.__str__() == other_str);
+        }
+        Ok(false)
+    }
+
+    fn __str__(&self) -> String {
+        unsplit_url(&self.scheme, &self.netloc, &self.path, &self.query, &self.fragment)
+    }
+
+    fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
+        let displayed = if self.password().is_some() {
+            self.with_password("**********").__str__()
+        } else {
+            self.__str__()
+        };
+        let repr = PyString::new(py, &displayed).repr()?;
+        Ok(format!("URL({repr})"))
+    }
+
+    #[getter]
+    fn scheme(&self) -> &str {
+        &self.scheme
+    }
+
+    #[getter]
+    fn hostname(&self) -> Option<String> {
+        let authority = parse_authority(&self.netloc)?;
+        let host = authority.host().to_string();
+        let stripped = host
+            .strip_prefix("[")
+            .and_then(|h| h.strip_suffix("]"))
+            .unwrap_or(&host);
+        if stripped.is_empty() {
+            None
+        } else {
+            Some(stripped.to_lowercase())
+        }
+    }
+
+    #[getter]
+    fn port(&self) -> Option<u16> {
+        port_from_netloc(&self.netloc)
+    }
+
+    #[getter]
+    fn netloc(&self) -> &str {
+        &self.netloc
+    }
+
+    #[getter]
+    fn username(&self) -> Option<String> {
+        username_from_netloc(&self.netloc)
+    }
+
+    #[getter]
+    fn password(&self) -> Option<String> {
+        password_from_netloc(&self.netloc)
+    }
+
+    #[getter]
+    fn path(&self) -> &str {
+        &self.path
+    }
+
+    #[getter]
+    fn query(&self) -> &str {
+        &self.query
+    }
+
+    #[getter]
+    fn fragment(&self) -> &str {
+        &self.fragment
+    }
+
+    #[getter]
+    fn is_secure(&self) -> bool {
+        self.scheme == "https" || self.scheme == "wss"
+    }
 
     #[pyo3(signature = (**kwargs))]
-    fn __replace__(
-        &self,
-        py: Python<'_>,
-        kwargs: Option<Bound<'_, PyDict>>,
-    ) -> PyResult<Py<PyAny>> {
-        self._replace(py, kwargs)
+    fn replace(&self, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<URL> {
+        let kwargs = match kwargs {
+            Some(k) => k,
+            None => return Ok(self.clone()),
+        };
+
+        let get_str = |name: &str| -> PyResult<Option<String>> {
+            kwargs.get_item(name)?.map(|v| v.extract::<String>()).transpose()
+        };
+        let get_opt_str = |name: &str| -> PyResult<Option<Option<String>>> {
+            match kwargs.get_item(name)? {
+                None => Ok(None),
+                Some(v) if v.is_none() => Ok(Some(None)),
+                Some(v) => Ok(Some(Some(v.extract::<String>()?))),
+            }
+        };
+        let get_opt_port = |name: &str| -> PyResult<Option<Option<u16>>> {
+            match kwargs.get_item(name)? {
+                None => Ok(None),
+                Some(v) if v.is_none() => Ok(Some(None)),
+                Some(v) => Ok(Some(Some(v.extract::<u16>()?))),
+            }
+        };
+
+        let hostname = get_str("hostname")?;
+        let port = get_opt_port("port")?;
+        let username = get_opt_str("username")?;
+        let password = get_opt_str("password")?;
+
+        let touches_netloc_parts = hostname.is_some() || port.is_some() || username.is_some() || password.is_some();
+
+        let new_netloc = if touches_netloc_parts {
+            build_netloc(&self.netloc, hostname, port, username, password)
+        } else {
+            get_str("netloc")?.unwrap_or_else(|| self.netloc.clone())
+        };
+
+        Ok(URL {
+            scheme: get_str("scheme")?.unwrap_or_else(|| self.scheme.clone()),
+            netloc: new_netloc,
+            path: get_str("path")?.unwrap_or_else(|| self.path.clone()),
+            query: get_str("query")?.unwrap_or_else(|| self.query.clone()),
+            fragment: get_str("fragment")?.unwrap_or_else(|| self.fragment.clone()),
+        })
+    }
+
+    #[pyo3(signature = (**kwargs))]
+    fn replace_query_params(&self, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<URL> {
+        let mut pairs: Vec<(String, String)> = Vec::new();
+        if let Some(kwargs) = kwargs {
+            for (key, value) in kwargs.iter() {
+                let key_str: String = key.extract()?;
+                let value_str: String = value.str()?.extract()?;
+                pairs.push((key_str, value_str));
+            }
+        }
+        Ok(URL {
+            scheme: self.scheme.clone(),
+            netloc: self.netloc.clone(),
+            path: self.path.clone(),
+            query: encode_pairs(&pairs),
+            fragment: self.fragment.clone(),
+        })
+    }
+
+    #[pyo3(signature = (**kwargs))]
+    fn include_query_params(&self, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<URL> {
+        let pairs = match kwargs {
+            Some(kwargs) => extract_query_pairs(self, &kwargs)?,
+            None => url::form_urlencoded::parse(self.query.as_bytes())
+                .map(|(k, v)| (k.into_owned(), v.into_owned()))
+                .collect(),
+        };
+        Ok(URL {
+            scheme: self.scheme.clone(),
+            netloc: self.netloc.clone(),
+            path: self.path.clone(),
+            query: encode_pairs(&pairs),
+            fragment: self.fragment.clone(),
+        })
+    }
+
+    fn remove_query_params(&self, keys: &Bound<'_, PyAny>) -> PyResult<URL> {
+        let keys_to_remove: Vec<String> = if let Ok(single) = keys.extract::<String>() {
+            vec![single]
+        } else {
+            keys.try_iter()?
+                .map(|item| item.and_then(|i| i.extract::<String>()))
+                .collect::<PyResult<Vec<_>>>()?
+        };
+
+        let pairs: Vec<(String, String)> = form_urlencoded::parse(self.query.as_bytes())
+            .map(|(k, v)| (k.into_owned(), v.into_owned()))
+            .filter(|(k, _)| !keys_to_remove.contains(k))
+            .collect();
+
+        Ok(URL {
+            scheme: self.scheme.clone(),
+            netloc: self.netloc.clone(),
+            path: self.path.clone(),
+            query: encode_pairs(&pairs),
+            fragment: self.fragment.clone(),
+        })
+    }
+}
+
+#[pyclass(module = "speedy.datastructures")]
+pub struct URLPath {
+    #[pyo3(get, set)]
+    path: Py<PyAny>,
+    #[pyo3(get, set)]
+    base: Py<PyAny>,
+}
+
+impl URLPath {
+    fn base_scheme_netloc_path(&self, py: Python<'_>) -> PyResult<URL> {
+        let base = self.base.bind(py);
+        if let Ok(url) = base.extract::<PyRef<'_, URL>>() {
+            return Ok(url.to_owned());
+        }
+        let raw: String = base.str()?.extract()?;
+        let url = split_url(&raw);
+        Ok(url)
+    }
+
+    fn make_absolute_url(&self, py: Python<'_>) -> PyResult<String> {
+        let url = self.base_scheme_netloc_path(py)?;
+        let trimmed_base_path = url.path.trim_end_matches('/');
+        let path_str: String = self.path.bind(py).str()?.extract()?;
+        let combined_path = format!("{trimmed_base_path}{path_str}");
+        Ok(unsplit_url(&url.scheme, &url.netloc, &combined_path, "", ""))
+    }
+}
+
+#[pymethods]
+impl URLPath {
+    #[new]
+    fn new(path: Py<PyAny>, base: Py<PyAny>) -> Self {
+        URLPath { path, base }
+    }
+
+    fn __str__(&self, py: Python<'_>) -> PyResult<String> {
+        self.make_absolute_url(py)
+    }
+
+    fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
+        let path_repr = self.path.bind(py).repr()?;
+        let base_repr = self.base.bind(py).repr()?;
+        Ok(format!("URLPath(path={path_repr}, base={base_repr})"))
     }
 }

@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Iterator, Mapping, MutableMapping
+from collections.abc import Iterable, Iterator, Mapping, MutableMapping, Sequence
 from typing import Any, NamedTuple, Self
 
 # datastructures.rs
@@ -88,3 +88,86 @@ class Address(NamedTuple):
 
     host: str
     port: int
+
+class URL:
+    """Representation and modification utilities of a URL."""
+
+    def __init__(self, url: str | URL | URLPath | None = ...) -> None: ...
+    def __str__(self) -> str: ...
+    def __repr__(self) -> str: ...
+    def __eq__(self, other: object) -> bool: ...
+    @property
+    def scheme(self) -> str:
+        """scheme in the URL."""
+        ...
+
+    @property
+    def hostname(self) -> str | None:
+        """hostname in the URL."""
+        ...
+
+    @property
+    def port(self) -> int | None:
+        """port in the URL."""
+        ...
+
+    @property
+    def netloc(self) -> str:
+        """netloc in the URL."""
+        ...
+
+    @property
+    def username(self) -> str | None:
+        """username in the URL."""
+        ...
+
+    @property
+    def password(self) -> str | None:
+        """password in the URL."""
+        ...
+
+    @property
+    def path(self) -> str:
+        """path in the URL."""
+        ...
+
+    @property
+    def query(self) -> str:
+        """query in the URL."""
+        ...
+
+    @property
+    def fragment(self) -> str:
+        """fragment in the URL."""
+        ...
+
+    @property
+    def is_secure(self) -> bool:
+        """Check if the URL is secure."""
+        ...
+
+    def replace(self, **kwargs: Any) -> Self:
+        """Replace components in the URL."""
+        ...
+
+    def replace_query_params(self, **kwargs: Any) -> Self:
+        """Replace query parameters in the URL."""
+        ...
+
+    def include_query_params(self, **kwargs: Any) -> Self:
+        """Include query parameters in the URL."""
+        ...
+
+    def remove_query_params(self, keys: str | Sequence[str]) -> URL:
+        """Remove query parameters in the URL."""
+        ...
+
+class URLPath:
+    """Create an absolute URL."""
+
+    path: str | URL
+    base: str | URL
+
+    def __init__(self, path: str | URL, base: str | URL) -> None: ...
+    def __str__(self) -> str: ...
+    def __repr__(self) -> str: ...
