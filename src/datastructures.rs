@@ -464,13 +464,17 @@ fn parse_authority(netloc: &str) -> Option<Authority<'static>> {
 
 fn unsplit_url(scheme: &str, netloc: &str, path: &str, query: &str, fragment: &str) -> String {
     let mut result = String::new();
+    let has_authority_prefix = !netloc.is_empty() || !scheme.is_empty();
     if !scheme.is_empty() {
         result.push_str(scheme);
         result.push(':');
     }
-    if !netloc.is_empty() || !scheme.is_empty() {
+    if has_authority_prefix {
         result.push_str("//");
         result.push_str(netloc);
+        if !path.is_empty() && !path.starts_with('/') {
+            result.push('/');
+        }
     }
     result.push_str(path);
     if !query.is_empty() {
