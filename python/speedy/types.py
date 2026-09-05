@@ -1,4 +1,4 @@
-from collections.abc import Awaitable, Callable, Iterable, MutableMapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Sequence
 from contextlib import AbstractAsyncContextManager
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -273,6 +273,8 @@ type Middleware = Callable[..., ASGIApplication]
 
 type HTTPExceptionHandler = Callable[[IRequest, Exception], IResponse]
 
-type ExceptionHandlersMap = MutableMapping[int | type[Exception], HTTPExceptionHandler]
+type ExceptionHandler = HTTPExceptionHandler
 
 type Lifespan = Sequence[Callable[[ASGIApplication], AbstractAsyncContextManager] | AbstractAsyncContextManager]
+
+type RawHeaders = list[tuple[bytes, bytes]]

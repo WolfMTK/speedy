@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
-from speedy.types import BaseScope, Receive, Send
+from speedy.middleware import Middleware
+from speedy.types import BaseScope, Lifespan, Receive, Send
 
 
 class BaseRoute[ScopeT: BaseScope](ABC):
@@ -20,12 +21,10 @@ class BaseRoute[ScopeT: BaseScope](ABC):
 class Router:
     def __init__(
         self,
-        route_handlers: Sequence[BaseRoute],
-    ) -> None:
-        self.route_handlers = tuple(route_handlers)
-
-    def register(self, value: BaseRoute) -> None:
-        if value in self:
-            # TODO: change exception
-            raise ValueError("Cannot register a router on itself")
-        self.route_handlers = (*self.route_handlers, value)
+        routes: Sequence[BaseRoute] | None = None,
+        redirect_slashes: bool = True,
+        lifespan: Lifespan | None = None,
+        *,
+        middleware: Sequence[Middleware] | None = None,
+        max_body_size: int | None = None,
+    ) -> None: ...
