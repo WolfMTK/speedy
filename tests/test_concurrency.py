@@ -1,9 +1,10 @@
+import functools
 import threading
 from collections.abc import Iterator
-from contextvars import ContextVar
+from typing import Any
 
 import pytest
-from speedy.concurrency import run_in_threadpool, _next_batch, iterate_in_threadpool
+from speedy.concurrency import run_in_threadpool, _next_batch, iterate_in_threadpool, is_async_callable
 
 
 @pytest.mark.anyio
@@ -150,3 +151,53 @@ async def test_runs_in_a_different_thread() -> None:
 
     result = [v async for v in iterate_in_threadpool(gen())]
     assert result != [caller_thread]
+
+
+def test_async_func() -> None:
+    async def async_func() -> None:
+        ...
+
+    def func() -> None:
+        ...
+
+    assert is_async_callable(async_func)
+    assert not is_async_callable(func)
+
+
+def test_async_method() -> None:
+    class Async:
+        async def method(self) -> None:
+            ...
+
+    class Sync:
+        def method(self) -> None:
+            ...
+
+    assert is_async_callable(Async().method)
+    assert not is_async_callable(Sync().method)
+
+
+def test_async_object_call() -> None:
+    class Async:
+        async def __call__(self) -> None:
+            ...
+
+    class Sync:
+        def __call__(self) -> None:
+            ...
+
+    assert is_async_callable(Async())
+    assert not is_async_callable(Sync())
+
+
+def test_async_partial_object_call() -> None:
+    class Async:
+        async def __call__(self, a: Any, b: Any) -> None:
+            ...
+
+    class Sync:
+        def __call__(self, a: Any, b: Any) -> None:
+            ...
+
+    assert is_async_callable(functools.partial(Async(), 1))
+    assert not is_async_callable(functools.partial(Sync(), 1))
