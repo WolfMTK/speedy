@@ -10,3 +10,5 @@ crate-type = ["cdylib"]
 [dependencies]
 indexmap = "2.14.1"
 pyo3 = "0.29.2"
+uriparse = "0.6.4"
+url = "2.5.8"
