@@ -17,7 +17,7 @@ fn state_exception(py: Python<'_>, message: String) -> PyErr {
         .and_then(|cls| cls.call1((message.clone(),)))
     {
         Ok(exc) => PyErr::from_value(exc),
-        Err(_) => pyo3::exceptions::PyValueError::new_err(message),
+        Err(_) => PyValueError::new_err(message),
     }
 }
 
@@ -762,7 +762,7 @@ impl URL {
     fn include_query_params(&self, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<URL> {
         let pairs = match kwargs {
             Some(kwargs) => extract_query_pairs(self, &kwargs)?,
-            None => url::form_urlencoded::parse(self.query.as_bytes())
+            None => form_urlencoded::parse(self.query.as_bytes())
                 .map(|(k, v)| (k.into_owned(), v.into_owned()))
                 .collect(),
         };
@@ -885,7 +885,7 @@ pub(crate) fn encode_latin1(s: &str) -> PyResult<Vec<u8>> {
         .map(|c| {
             let code = c as u32;
             if code > 0xFF {
-                Err(pyo3::exceptions::PyValueError::new_err(format!(
+                Err(PyValueError::new_err(format!(
                     "'latin-1' codec can't encode character '\\u{code:04x}'"
                 )))
             } else {
