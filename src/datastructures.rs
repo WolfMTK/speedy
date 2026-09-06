@@ -1,8 +1,10 @@
+use std::fs::File;
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::sync::Arc;
 
 use indexmap::IndexMap;
-use pyo3::exceptions::{PyAttributeError, PyIndexError, PyKeyError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyAttributeError, PyIndexError, PyKeyError, PyOSError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{IntoPyDict, PyBool, PyBytes, PyDict, PyList, PyString, PyTuple, PyType};
 use uriparse::Authority;
@@ -1602,5 +1604,147 @@ impl QueryParams {
         let s = Self::__str__(slf)?;
         let repr_s = PyString::new(py, &s).repr()?;
         Ok(format!("{class_name}({repr_s})"))
+    }
+}
+
+enum Storage {
+    Memory(Cursor<Vec<u8>>),
+    Disk(File),
+}
+
+fn to_pyerr(e: std::io::Error) -> PyErr {
+    PyOSError::new_err(e.to_string())
+}
+
+#[pyclass(subclass, module = "speedy.datastructures")]
+pub struct UploadFile {
+    #[pyo3(get, set)]
+    filename: String,
+    #[pyo3(get, set)]
+    headers: Py<PyDict>,
+    max_size: u64,
+    storage: Storage,
+}
+
+impl UploadFile {
+    fn roll_over_if_needed(&mut self) -> std::io::Result<()> {
+        if let Storage::Memory(cursor) = &self.storage {
+            if cursor.get_ref().len() as u64 > self.max_size {
+                let position = cursor.position();
+                let mut disk_file = tempfile::tempfile()?;
+                disk_file.write_all(cursor.get_ref())?;
+                disk_file.seek(SeekFrom::Start(position))?;
+                self.storage = Storage::Disk(disk_file);
+            }
+        }
+        Ok(())
+    }
+
+    fn write_bytes(&mut self, data: &[u8]) -> std::io::Result<usize> {
+        let written = match &mut self.storage {
+            Storage::Memory(cursor) => cursor.write(data)?,
+            Storage::Disk(file) => file.write(data)?,
+        };
+        self.roll_over_if_needed()?;
+        Ok(written)
+    }
+
+    fn read_bytes(&mut self, size: i64) -> std::io::Result<Vec<u8>> {
+        let reader: &mut dyn Read = match &mut self.storage {
+            Storage::Memory(cursor) => cursor,
+            Storage::Disk(file) => file,
+        };
+        if size < 0 {
+            let mut buf = Vec::new();
+            reader.read_to_end(&mut buf)?;
+            Ok(buf)
+        } else {
+            let mut buf = vec![0u8; size as usize];
+            let n = reader.read(&mut buf)?;
+            buf.truncate(n);
+            Ok(buf)
+        }
+    }
+
+    fn seek_to(&mut self, offset: i64) -> std::io::Result<u64> {
+        match &mut self.storage {
+            Storage::Memory(cursor) => cursor.seek(SeekFrom::Start(offset as u64)),
+            Storage::Disk(file) => file.seek(SeekFrom::Start(offset as u64)),
+        }
+    }
+
+    fn tell(&mut self) -> std::io::Result<u64> {
+        match &mut self.storage {
+            Storage::Memory(cursor) => cursor.stream_position(),
+            Storage::Disk(file) => file.stream_position(),
+        }
+    }
+}
+
+#[pymethods]
+impl UploadFile {
+    #[new]
+    #[pyo3(signature = (filename, *, file_data=None, size=1_048_576, headers=None))]
+    fn new(
+        py: Python<'_>,
+        filename: String,
+        file_data: Option<&[u8]>,
+        size: u64,
+        headers: Option<Py<PyDict>>,
+    ) -> PyResult<Self> {
+        let mut this = UploadFile {
+            filename,
+            headers: headers.unwrap_or_else(|| PyDict::new(py).unbind()),
+            max_size: size,
+            storage: Storage::Memory(Cursor::new(Vec::new())),
+        };
+        if let Some(data) = file_data {
+            if !data.is_empty() {
+                this.write_bytes(data).map_err(to_pyerr)?;
+                this.seek_to(0).map_err(to_pyerr)?;
+            }
+        }
+        Ok(this)
+    }
+
+    fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
+        let filename_repr = PyString::new(py, &self.filename).repr()?;
+        let headers_repr = self.headers.bind(py).repr()?;
+        Ok(format!("UploadFile(filename={filename_repr}, headers={headers_repr})"))
+    }
+
+    #[getter]
+    fn content_type(&self, py: Python<'_>) -> PyResult<Option<String>> {
+        match self.headers.bind(py).get_item("content-type")? {
+            Some(value) => Ok(Some(value.extract()?)),
+            None => Ok(None),
+        }
+    }
+
+    #[getter]
+    fn is_spooled_to_disk(&self) -> bool {
+        matches!(self.storage, Storage::Disk(_))
+    }
+
+    fn _write_sync(&mut self, data: &[u8]) -> PyResult<usize> {
+        self.write_bytes(data).map_err(to_pyerr)
+    }
+
+    #[pyo3(signature = (size=-1))]
+    fn _read_sync(&mut self, size: i64) -> PyResult<Vec<u8>> {
+        self.read_bytes(size).map_err(to_pyerr)
+    }
+
+    fn _seek_sync(&mut self, offset: i64) -> PyResult<u64> {
+        self.seek_to(offset).map_err(to_pyerr)
+    }
+
+    fn _size_sync(&mut self) -> PyResult<u64> {
+        self.tell().map_err(to_pyerr)
+    }
+
+    fn _close_sync(&mut self) -> PyResult<()> {
+        self.storage = Storage::Memory(Cursor::new(Vec::new()));
+        Ok(())
     }
 }

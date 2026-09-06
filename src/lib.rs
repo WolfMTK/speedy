@@ -10,7 +10,7 @@ mod _speedy {
     #[pymodule_export]
     use crate::datastructures::{
         Address, Headers, ImmutableMultiDict, ImmutableState, MultiDict, MutableHeaders, QueryParams, State, URL,
-        URLPath,
+        URLPath, UploadFile,
     };
     #[pymodule_export]
     use crate::responses::Response;

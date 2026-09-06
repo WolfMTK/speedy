@@ -349,6 +349,37 @@ class MultiDict(ImmutableMultiDict[Any, Any]):
         """Set list."""
         ...
 
+class UploadFile:
+    """An uploaded file."""
+
+    filename: str
+    headers: dict[str, str]
+
+    def __init__(
+        self,
+        filename: str,
+        *,
+        file_data: bytes | None = ...,
+        size: int = ...,
+        headers: dict[str, str] | None = ...,
+    ) -> None: ...
+    def __repr__(self) -> str: ...
+    @property
+    def content_type(self) -> str | None:
+        """Get content type from headers."""
+        ...
+
+    @property
+    def is_spooled_to_disk(self) -> bool:
+        """Whether the data has spilled over to a real, disk-backed file."""
+        ...
+
+    def _write_sync(self, data: bytes) -> int: ...
+    def _read_sync(self, size: int = ...) -> bytes: ...
+    def _seek_sync(self, offset: int) -> int: ...
+    def _size_sync(self) -> int: ...
+    def _close_sync(self) -> None: ...
+
 # responses.rs
 class Response:
     """An HTTP response."""
