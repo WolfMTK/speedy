@@ -13,6 +13,7 @@ from speedy.datastructures import (
     Headers,
     MutableHeaders,
     ImmutableMultiDict,
+    MultiDict,
 )
 from speedy.exceptions import StateException
 
@@ -800,3 +801,105 @@ class TestImmutableMultiDict:
         multidict.clear()
         assert len(multidict.multi_items()) == ZERO
         assert len(multidict.items()) == ZERO
+
+
+class TestMultiDict:
+    def test_multidict(self) -> None:
+        multidict = MultiDict([('a', '123'), ('a', '456'), ('b', '789')], c='12')
+
+        assert 'a' in multidict
+        assert 'A' not in multidict
+        assert 'c' in multidict
+        assert multidict['a'] == '456'
+        assert multidict.get('a') == '456'
+        assert multidict.get('d') is None
+        assert multidict.getList('a') == ['123', '456']
+        assert list(multidict.keys()) == ['a', 'b', 'c']
+        assert list(multidict.values()) == ['456', '789', '12']
+        assert list(multidict.items()) == [('a', '456'), ('b', '789'), ('c', '12',)]
+        assert len(multidict) == 3
+        assert list(multidict) == ['a', 'b', 'c']
+        assert dict(multidict) == {'a': '456', 'b': '789', 'c': '12'}
+        assert str(multidict) == "MultiDict([('a', '123'), ('a', '456'), ('b', '789'), ('c', '12')])"
+        assert repr(multidict) == "MultiDict([('a', '123'), ('a', '456'), ('b', '789'), ('c', '12')])"
+        assert MultiDict({'a': '123', 'b': '456'}) == MultiDict([('a', '123'), ('b', '456')])
+        assert MultiDict({'a': '123', 'b': '456'}) == MultiDict({'a': '123', 'b': '456'})
+        assert MultiDict() == MultiDict({})
+        assert MultiDict({'a': '123', 'b': '456'}) != 'invalid'
+
+    def test_multidict_update(self) -> None:
+        multidict = MultiDict([('a', '123'), ('b', '456',)])
+        multidict.update({'a': '789'})
+        assert multidict.getList('a') == ['789']
+        assert multidict == MultiDict([('a', '789'), ('b', '456')])
+
+        multidict = MultiDict([('a', '123'), ('b', '456',)])
+        multidict.update(multidict)
+        assert repr(multidict) == "MultiDict([('a', '123'), ('b', '456')])"
+
+        multidict = MultiDict([('a', '123'), ('a', '456',)])
+        multidict.update([('a', '123',)])
+        assert multidict.getList('a') == ['123']
+        multidict.update([('a', '456')], a='789', b='123')
+        assert multidict == MultiDict([('a', '456'), ('a', '789'), ('b', '123')])
+
+    def test_multidict_append(self) -> None:
+        multidict = MultiDict([('a', '123')])
+        multidict.append('a', '456')
+        assert multidict.getList('a') == ['123', '456']
+        assert repr(multidict) == "MultiDict([('a', '123'), ('a', '456')])"
+
+    def test_multidict_setdefault(self) -> None:
+        multidict = MultiDict([('a', '123')])
+        assert multidict.setdefault('a', '456') == '123'
+        assert multidict.getList('a') == ['123']
+        assert multidict.setdefault('b', '456') == '456'
+        assert multidict.getList('b') == ['456']
+        assert repr(multidict) == "MultiDict([('a', '123'), ('b', '456')])"
+
+    def test_multidict_setlist(self) -> None:
+        multidict = MultiDict([('a', '123')])
+        multidict.setlist('a', ['456', '789'])
+        assert multidict.getList('a') == ['456', '789']
+        multidict.setlist('b', [])
+        assert 'b' not in multidict
+
+    def test_multidict_clear(self) -> None:
+        multidict = MultiDict([('a', '123'), ('a', '456'), ('b', '789')])
+        multidict.clear()
+        assert multidict.get('a') is None
+        assert repr(multidict) == 'MultiDict([])'
+
+    def test_multidict_poplist(self) -> None:
+        multidict = MultiDict([('a', '123'), ('a', '456'), ('b', '789')])
+        assert multidict.poplist('a') == ['123', '456']
+        assert multidict.get('a') is None
+        assert repr(multidict) == "MultiDict([('b', '789')])"
+
+    def test_multidict_popitem(self) -> None:
+        multidict = MultiDict([('a', '123'), ('a', '456'), ('b', '789')])
+        item = multidict.popitem()
+        assert multidict.get(item[0]) is None
+
+    def test_multidict_pop(self) -> None:
+        multidict = MultiDict([('a', '123'), ('a', '456'), ('b', '789')])
+        assert multidict.pop('a') == '456'
+        assert multidict.get('a') is None
+        assert repr(multidict) == "MultiDict([('b', '789')])"
+
+    def test_multidict_del(self) -> None:
+        multidict = MultiDict([('a', '123'), ('a', '456',)])
+        del multidict['a']
+        assert multidict.get('a') is None
+        assert repr(multidict) == 'MultiDict([])'
+
+    def test_multidict_get(self) -> None:
+        multidict = MultiDict([('a', '123'), ('a', '456',)])
+        multidict['a'] = '789'
+        assert multidict['a'] == '789'
+        assert multidict.get('a') == '789'
+        assert multidict.getList('a') == ['789']
+
+    def test_multidict_eq(self) -> None:
+        multidict = MultiDict([('a', '123'), ('a', '456',)])
+        assert MultiDict(multidict) == multidict
