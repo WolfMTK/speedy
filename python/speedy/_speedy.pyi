@@ -1,6 +1,9 @@
+from abc import ABC, abstractmethod
 from collections.abc import ItemsView, Iterable, Iterator, KeysView, Mapping, MutableMapping, Sequence, ValuesView
-from typing import Any, NamedTuple, Self
+from datetime import datetime
+from typing import Any, Literal, NamedTuple, Self
 
+from speedy.background import BackgroundTask
 from speedy.types import RawHeaders
 
 # datastructures.rs
@@ -241,4 +244,153 @@ class MutableHeaders(Headers):
 
     def add_vary_header(self, vary: str) -> None:
         """Extend a multivalued header."""
+        ...
+
+class _MultiMapping[Key, Value](ABC):
+    def __setitem__(self, key: Key, values: list[Value]) -> None: ...
+    def __getitem__(self, key: Key) -> Value: ...
+    def __delitem__(self, key: Any) -> None: ...
+    def __contains__(self, key: Any) -> bool: ...
+    def __len__(self) -> int: ...
+    def __eq__(self, other: Any) -> bool: ...
+    def __repr__(self) -> str: ...
+    def __iter__(self) -> Iterator[Key]: ...
+    @abstractmethod
+    def update(
+        self, *args: Mapping[Key, Value] | _MultiMapping[Key, Value] | list[tuple[Any, Any]], **kwargs: Any
+    ) -> None: ...
+    @abstractmethod
+    def get(self, key: Any, default: Any): ...
+    @abstractmethod
+    def append(self, key: Any, value: Any) -> None: ...
+    @abstractmethod
+    def getList(self, key: Any) -> list[Value]: ...
+    @abstractmethod
+    def clear(self) -> None: ...
+    @abstractmethod
+    def pop(self, key: Any, default: Any): ...
+    @abstractmethod
+    def popitem(self) -> tuple[Any, Any]: ...
+    @abstractmethod
+    def poplist(self, key: Any) -> list[Any]: ...
+    @abstractmethod
+    def keys(self) -> KeysView[Key]: ...
+    @abstractmethod
+    def values(self) -> ValuesView[Value]: ...
+    @abstractmethod
+    def items(self) -> ItemsView[Key, Value]: ...
+    @abstractmethod
+    def multi_items(self) -> list[tuple[Key, Value]]: ...
+
+class ImmutableMultiDict[Key, Value](_MultiMapping[Key, Value]):
+    def __init__(
+        self, *args: _MultiMapping[Key, Value] | Mapping[Key, Value] | Iterable[tuple[Key, Value]], **kwargs: Any
+    ) -> None: ...
+    def get(self, key: Any, default: Any = None) -> Any:
+        """Get value."""
+        ...
+
+    def update(
+        self, *args: Mapping[Key, Value] | _MultiMapping[Key, Value] | list[tuple[Any, Any]], **kwargs: Any
+    ) -> None:
+        """Update items"""
+        ...
+
+    def keys(self) -> KeysView[Key]:
+        """Get keys."""
+        ...
+
+    def values(self) -> ValuesView[Value]:
+        """Get values."""
+        ...
+
+    def items(self) -> ItemsView[Key, Value]:
+        """Get items."""
+        ...
+
+    def clear(self) -> None:
+        """Clear items."""
+        ...
+
+    def pop(self, key: Any, default: Any = None):
+        """Pop element in collection."""
+        ...
+
+    def popitem(self) -> tuple[Any, Any]:
+        """Popitem element in collection."""
+        ...
+
+    def poplist(self, key: Any) -> list[Any]:
+        """Poplist element in collection."""
+        ...
+
+    def append(self, key: Any, value: Any) -> None:
+        """Append element in collection."""
+        ...
+
+    def getList(self, key: Any) -> list[Value]:
+        """Get array elements."""
+        ...
+
+    def multi_items(self) -> list[tuple[Key, Value]]:
+        """Get items."""
+        ...
+
+# responses.rs
+class Response:
+    """An HTTP response."""
+
+    status_code: int
+    media_type: str | None
+    charset: str
+    background: BackgroundTask | None
+    body: bytes | memoryview
+
+    def __new__(
+        cls,
+        content: Any = ...,
+        status_code: int = ...,
+        headers: Mapping[str, str] | None = ...,
+        media_type: str | None = ...,
+        background: BackgroundTask | None = ...,
+    ) -> Self: ...
+    @property
+    def headers(self) -> MutableHeaders:
+        """Get a mutable view over the response's headers."""
+        ...
+
+    @property
+    def raw_headers(self) -> RawHeaders:
+        """Get the raw (name, value) header pairs."""
+        ...
+
+    @raw_headers.setter
+    def raw_headers(self, value: RawHeaders) -> None: ...
+    def set_cookie(
+        self,
+        key: str,
+        value: str = ...,
+        max_age: int | None = ...,
+        expires: datetime | str | int | None = ...,
+        path: str | None = ...,
+        domain: str | None = ...,
+        secure: bool = ...,
+        httponly: bool = ...,
+        samesite: Literal["lax", "strict", "none"] | None = ...,
+        partitioned: bool = ...,
+    ) -> None:
+        """Set a cookie on the response."""
+        ...
+
+    def delete_cookie(
+        self,
+        key: str,
+        path: str = ...,
+        domain: str | None = ...,
+        secure: bool = ...,
+        httponly: bool = ...,
+        samesite: Literal["lax", "strict", "none"] | None = ...,
+        partitioned: bool = ...,
+    ) -> None:
+        """Delete a cookie by expiring it immediately."""
         ...

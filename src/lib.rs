@@ -1,4 +1,5 @@
 mod datastructures;
+mod responses;
 
 use pyo3::prelude::*;
 
@@ -7,7 +8,11 @@ mod _speedy {
     use pyo3::prelude::*;
 
     #[pymodule_export]
-    use crate::datastructures::{Address, Headers, ImmutableState, MutableHeaders, State, URL, URLPath};
+    use crate::datastructures::{
+        Address, Headers, ImmutableMultiDict, ImmutableState, MutableHeaders, State, URL, URLPath,
+    };
+    #[pymodule_export]
+    use crate::responses::Response;
 
     #[pymodule_init]
     fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -2,9 +2,9 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
 
 use indexmap::IndexMap;
-use pyo3::exceptions::{PyAttributeError, PyKeyError, PyTypeError};
+use pyo3::exceptions::{PyAttributeError, PyIndexError, PyKeyError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyBytes, PyDict, PyList, PyString, PyTuple, PyType};
+use pyo3::types::{IntoPyDict, PyBool, PyBytes, PyDict, PyList, PyString, PyTuple, PyType};
 use uriparse::Authority;
 use url::form_urlencoded;
 
@@ -845,7 +845,7 @@ impl URLPath {
     }
 }
 
-fn get_raw_from_inputs(
+pub(crate) fn get_raw_from_inputs(
     headers: Option<&Bound<'_, PyAny>>,
     raw: Option<&Bound<'_, PyAny>>,
     scope: Option<&Bound<'_, PyDict>>,
@@ -880,7 +880,7 @@ fn get_raw_from_inputs(
     }
 }
 
-fn encode_latin1(s: &str) -> PyResult<Vec<u8>> {
+pub(crate) fn encode_latin1(s: &str) -> PyResult<Vec<u8>> {
     s.chars()
         .map(|c| {
             let code = c as u32;
@@ -899,13 +899,13 @@ fn decode_latin1(bytes: &[u8]) -> String {
     bytes.iter().map(|&b| b as char).collect()
 }
 
-fn raw_to_pylist<'py>(py: Python<'py>, raw: &[(Vec<u8>, Vec<u8>)]) -> PyResult<Bound<'py, PyList>> {
+pub(crate) fn raw_to_pylist<'py>(py: Python<'py>, raw: &[(Vec<u8>, Vec<u8>)]) -> PyResult<Bound<'py, PyList>> {
     PyList::new(py, raw.iter().map(|(k, v)| (PyBytes::new(py, k), PyBytes::new(py, v))))
 }
 
 #[pyclass(mapping, subclass, module = "speedy.datastructures")]
 pub struct Headers {
-    raw: Vec<(Vec<u8>, Vec<u8>)>,
+    pub(crate) raw: Vec<(Vec<u8>, Vec<u8>)>,
 }
 
 #[pymethods]
@@ -1162,5 +1162,287 @@ impl MutableHeaders {
             None => vary,
         };
         set_header(&mut base.raw, "vary", &new_value)
+    }
+}
+
+fn dict_from_stack(py: Python<'_>, stack: &[(Py<PyAny>, Py<PyAny>)]) -> PyResult<Py<PyDict>> {
+    stack
+        .iter()
+        .map(|(k, v)| (k.bind(py), v.bind(py)))
+        .into_py_dict(py)
+        .map(Bound::unbind)
+}
+
+fn check_args_len(len: usize) -> PyResult<()> {
+    if len >= 2 {
+        return Err(PyAttributeError::new_err("Too many arguments."));
+    }
+
+    Ok(())
+}
+
+fn build_items(
+    arg0: Option<&Bound<'_, PyAny>>,
+    kwargs: Option<&Bound<'_, PyDict>>,
+) -> PyResult<Vec<(Py<PyAny>, Py<PyAny>)>> {
+    let base = arg0.map_or_else(|| Ok(Vec::new()), extract_pairs)?;
+    Ok(base
+        .into_iter()
+        .chain(kwargs.into_iter().flatten().map(|(k, v)| (k.unbind(), v.unbind())))
+        .collect())
+}
+
+fn extract_pairs(value: &Bound<'_, PyAny>) -> PyResult<Vec<(Py<PyAny>, Py<PyAny>)>> {
+    if !value.is_truthy()? {
+        return Ok(Vec::new());
+    }
+    if value.hasattr("multi_items")? {
+        let items = value.call_method0("multi_items")?;
+        return pairs_from_iterable(&items);
+    }
+    if value.hasattr("items")? {
+        let items = value.call_method0("items")?;
+        return pairs_from_iterable(&items);
+    }
+    pairs_from_iterable(value)
+}
+
+fn pairs_from_iterable(value: &Bound<'_, PyAny>) -> PyResult<Vec<(Py<PyAny>, Py<PyAny>)>> {
+    value.try_iter()?.map(|item| pair_from_any(&item?)).collect()
+}
+
+fn pair_from_any(item: &Bound<'_, PyAny>) -> PyResult<(Py<PyAny>, Py<PyAny>)> {
+    let mut iter = item.try_iter()?;
+    let first = match iter.next() {
+        Some(v) => v?,
+        None => return Err(PyValueError::new_err("not enough values to unpack (expected 2, got 0)")),
+    };
+    let second = match iter.next() {
+        Some(v) => v?,
+        None => return Err(PyValueError::new_err("not enough values to unpack (expected 2, got 1)")),
+    };
+    if iter.next().is_some() {
+        return Err(PyValueError::new_err("too many values to unpack (expected 2)"));
+    }
+    Ok((first.unbind(), second.unbind()))
+}
+
+fn stack_without_key(
+    py: Python<'_>,
+    stack: &[(Py<PyAny>, Py<PyAny>)],
+    key: &Bound<'_, PyAny>,
+) -> PyResult<Vec<(Py<PyAny>, Py<PyAny>)>> {
+    stack
+        .iter()
+        .try_fold(Vec::with_capacity(stack.len()), |mut acc, (k, v)| -> PyResult<_> {
+            if !k.bind(py).eq(key)? {
+                acc.push((k.clone_ref(py), v.clone_ref(py)));
+            }
+            Ok(acc)
+        })
+}
+
+fn stack_values_for_key(
+    py: Python<'_>,
+    stack: &[(Py<PyAny>, Py<PyAny>)],
+    key: &Bound<'_, PyAny>,
+) -> PyResult<Vec<Py<PyAny>>> {
+    stack.iter().try_fold(Vec::new(), |mut acc, (k, v)| -> PyResult<_> {
+        if k.bind(py).eq(key)? {
+            acc.push(v.clone_ref(py));
+        }
+        Ok(acc)
+    })
+}
+
+fn stack_to_pylist<'py>(py: Python<'py>, stack: &[(Py<PyAny>, Py<PyAny>)]) -> PyResult<Bound<'py, PyList>> {
+    let items = stack
+        .iter()
+        .map(|(k, v)| PyTuple::new(py, [k.clone_ref(py), v.clone_ref(py)]).map(|t| t.into_any()))
+        .collect::<PyResult<Vec<_>>>()?;
+    PyList::new(py, items)
+}
+
+fn pyobj_to_vec(value: &Bound<'_, PyAny>) -> PyResult<Vec<Py<PyAny>>> {
+    value.try_iter()?.map(|item| Ok(item?.unbind())).collect()
+}
+
+#[pyclass(mapping, subclass, module = "speedy.datastructures")]
+pub struct ImmutableMultiDict {
+    stack: Vec<(Py<PyAny>, Py<PyAny>)>,
+    dict: Py<PyDict>,
+}
+
+impl ImmutableMultiDict {
+    fn from_stack(py: Python<'_>, stack: Vec<(Py<PyAny>, Py<PyAny>)>) -> PyResult<Self> {
+        let dict = dict_from_stack(py, &stack)?;
+        Ok(Self { stack, dict })
+    }
+}
+
+#[pymethods]
+impl ImmutableMultiDict {
+    #[new]
+    #[pyo3(signature = (*args, **kwargs))]
+    fn new(py: Python<'_>, args: &Bound<'_, PyTuple>, kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
+        check_args_len(args.len())?;
+        let arg0 = if args.is_empty() { None } else { Some(args.get_item(0)?) };
+        let items = build_items(arg0.as_ref(), kwargs)?;
+        Self::from_stack(py, items)
+    }
+
+    fn __setitem__(&mut self, py: Python<'_>, key: Py<PyAny>, values: &Bound<'_, PyAny>) -> PyResult<()> {
+        let values_vec = pyobj_to_vec(values)?;
+        let last = values_vec
+            .last()
+            .ok_or_else(|| PyIndexError::new_err("list index out of range"))?
+            .clone_ref(py);
+        let key_bound = key.bind(py).clone();
+        let mut new_stack = stack_without_key(py, &self.stack, &key_bound)?;
+        new_stack.extend(values_vec.iter().map(|v| (key.clone_ref(py), v.clone_ref(py))));
+        self.stack = new_stack;
+        self.dict.bind(py).set_item(key, last)?;
+        Ok(())
+    }
+
+    fn __getitem__(&self, py: Python<'_>, key: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        self.dict
+            .bind(py)
+            .get_item(key)?
+            .map(|v| v.unbind())
+            .ok_or_else(|| PyKeyError::new_err(key.clone().unbind()))
+    }
+
+    fn __delitem__(&mut self, py: Python<'_>, key: &Bound<'_, PyAny>) -> PyResult<()> {
+        if !self.dict.bind(py).contains(key)? {
+            return Err(PyKeyError::new_err(key.clone().unbind()));
+        }
+        self.dict.bind(py).del_item(key)?;
+        self.stack = stack_without_key(py, &self.stack, key)?;
+        Ok(())
+    }
+
+    fn __contains__(&self, py: Python<'_>, key: &Bound<'_, PyAny>) -> PyResult<bool> {
+        self.dict.bind(py).contains(key)
+    }
+
+    fn __len__(&self, py: Python<'_>) -> usize {
+        self.dict.bind(py).len()
+    }
+
+    fn __eq__(slf: &Bound<'_, Self>, other: &Bound<'_, PyAny>) -> PyResult<bool> {
+        let py = slf.py();
+        let self_type = slf.get_type();
+        if !other.is_instance(&self_type)? {
+            return Ok(false);
+        }
+        let other_ref = other.extract::<PyRef<'_, ImmutableMultiDict>>()?;
+        let self_list = stack_to_pylist(py, &slf.borrow().stack)?;
+        let other_list = stack_to_pylist(py, &other_ref.stack)?;
+        let builtins = py.import("builtins")?;
+        let sorted_self = builtins.call_method1("sorted", (self_list,))?;
+        let sorted_other = builtins.call_method1("sorted", (other_list,))?;
+        sorted_self.eq(sorted_other)
+    }
+
+    fn __repr__(slf: &Bound<'_, Self>) -> PyResult<String> {
+        let py = slf.py();
+        let class_name: String = slf.get_type().getattr("__name__")?.extract()?;
+        let items_repr = stack_to_pylist(py, &slf.borrow().stack)?.repr()?;
+        Ok(format!("{class_name}({items_repr})"))
+    }
+
+    fn __iter__(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(self.dict.bind(py).as_any().call_method0("__iter__")?.unbind())
+    }
+
+    #[pyo3(signature = (key, default=None))]
+    fn get(&self, py: Python<'_>, key: &Bound<'_, PyAny>, default: Option<Py<PyAny>>) -> PyResult<Py<PyAny>> {
+        match self.dict.bind(py).get_item(key)? {
+            Some(v) => Ok(v.unbind()),
+            None => Ok(default.unwrap_or_else(|| py.None())),
+        }
+    }
+
+    #[pyo3(signature = (*args, **kwargs))]
+    fn update(
+        &mut self,
+        py: Python<'_>,
+        args: &Bound<'_, PyTuple>,
+        kwargs: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<()> {
+        check_args_len(args.len())?;
+        let arg0 = args.iter().next();
+        let items = build_items(arg0.as_ref(), kwargs)?;
+        let value_dict = dict_from_stack(py, &items)?;
+        let value_dict = value_dict.bind(py);
+
+        let mut new_stack = Vec::with_capacity(self.stack.len() + items.len());
+        self.stack.iter().try_for_each(|(k, v)| -> PyResult<()> {
+            if !value_dict.contains(k.bind(py))? {
+                new_stack.push((k.clone_ref(py), v.clone_ref(py)));
+            }
+            Ok(())
+        })?;
+        new_stack.extend(items);
+        self.stack = new_stack;
+
+        let self_dict = self.dict.bind(py);
+        value_dict.iter().try_for_each(|(k, v)| self_dict.set_item(k, v))
+    }
+
+    fn keys(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(self.dict.bind(py).call_method0("keys")?.unbind())
+    }
+
+    fn values(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(self.dict.bind(py).call_method0("values")?.unbind())
+    }
+
+    fn items(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(self.dict.bind(py).call_method0("items")?.unbind())
+    }
+
+    fn clear(&mut self, py: Python<'_>) -> PyResult<()> {
+        self.dict.bind(py).clear();
+        self.stack.clear();
+        Ok(())
+    }
+
+    #[pyo3(signature = (key, default=None))]
+    fn pop(&mut self, py: Python<'_>, key: &Bound<'_, PyAny>, default: Option<Py<PyAny>>) -> PyResult<Py<PyAny>> {
+        self.stack = stack_without_key(py, &self.stack, key)?;
+        let default = default.unwrap_or_else(|| py.None());
+        Ok(self.dict.bind(py).call_method1("pop", (key, default))?.unbind())
+    }
+
+    fn popitem(&mut self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let item = self.dict.bind(py).call_method0("popitem")?;
+        let key = item.get_item(0)?;
+        self.stack = stack_without_key(py, &self.stack, &key)?;
+        Ok(item.unbind())
+    }
+
+    fn poplist(&mut self, py: Python<'_>, key: &Bound<'_, PyAny>) -> PyResult<Py<PyList>> {
+        let values = stack_values_for_key(py, &self.stack, key)?;
+        self.stack = stack_without_key(py, &self.stack, key)?;
+        self.dict.bind(py).call_method1("pop", (key, py.None()))?;
+        Ok(PyList::new(py, values)?.unbind())
+    }
+
+    fn append(&mut self, py: Python<'_>, key: Py<PyAny>, value: Py<PyAny>) -> PyResult<()> {
+        self.stack.push((key.clone_ref(py), value.clone_ref(py)));
+        self.dict.bind(py).set_item(key, value)?;
+        Ok(())
+    }
+
+    #[pyo3(name = "getList")]
+    fn get_list(&self, py: Python<'_>, key: &Bound<'_, PyAny>) -> PyResult<Py<PyList>> {
+        let values = stack_values_for_key(py, &self.stack, key)?;
+        Ok(PyList::new(py, values)?.unbind())
+    }
+
+    fn multi_items(&self, py: Python<'_>) -> PyResult<Py<PyList>> {
+        Ok(stack_to_pylist(py, &self.stack)?.unbind())
     }
 }
