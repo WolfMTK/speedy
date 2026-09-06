@@ -1523,3 +1523,84 @@ impl MultiDict {
         }
     }
 }
+
+fn parse_query_string_pairs(bytes: &[u8]) -> Vec<(String, String)> {
+    form_urlencoded::parse(bytes)
+        .map(|(k, v)| (k.into_owned(), v.into_owned()))
+        .collect()
+}
+
+fn pairs_to_pylist<'py>(py: Python<'py>, pairs: &[(String, String)]) -> PyResult<Bound<'py, PyList>> {
+    let items = pairs
+        .iter()
+        .map(|(k, v)| PyTuple::new(py, [k.as_str(), v.as_str()]).map(|t| t.into_any()))
+        .collect::<PyResult<Vec<_>>>()?;
+    PyList::new(py, items)
+}
+
+#[pyclass(mapping, extends = ImmutableMultiDict, subclass, module = "speedy.datastructures")]
+pub struct QueryParams {}
+
+#[pymethods]
+impl QueryParams {
+    #[new]
+    #[pyo3(signature = (*args, **kwargs))]
+    fn new(
+        py: Python<'_>,
+        args: &Bound<'_, PyTuple>,
+        kwargs: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<PyClassInitializer<QueryParams>> {
+        check_args_len(args.len())?;
+        let arg0 = if args.is_empty() { None } else { Some(args.get_item(0)?) };
+
+        let transformed: Option<Bound<'_, PyAny>> = match &arg0 {
+            None => None,
+            Some(value) => {
+                if let Ok(s) = value.extract::<String>() {
+                    let pairs = parse_query_string_pairs(s.as_bytes());
+                    Some(pairs_to_pylist(py, &pairs)?.into_any())
+                } else if let Ok(b) = value.cast::<PyBytes>() {
+                    let pairs = parse_query_string_pairs(b.as_bytes());
+                    Some(pairs_to_pylist(py, &pairs)?.into_any())
+                } else {
+                    Some(value.clone())
+                }
+            }
+        };
+
+        let items = build_items(transformed.as_ref(), kwargs)?;
+
+        let stack: Vec<(Py<PyAny>, Py<PyAny>)> = items
+            .into_iter()
+            .map(|(k, v)| -> PyResult<(Py<PyAny>, Py<PyAny>)> {
+                let k_str = k.bind(py).str()?.into_any().unbind();
+                let v_str = v.bind(py).str()?.into_any().unbind();
+                Ok((k_str, v_str))
+            })
+            .collect::<PyResult<_>>()?;
+
+        let base = ImmutableMultiDict::from_stack(py, stack)?;
+        Ok(PyClassInitializer::from(base).add_subclass(QueryParams {}))
+    }
+
+    fn __str__(slf: &Bound<'_, Self>) -> PyResult<String> {
+        let py = slf.py();
+        let base = slf.borrow().into_super();
+        let pairs: Vec<(String, String)> = base
+            .stack
+            .iter()
+            .map(|(k, v)| -> PyResult<(String, String)> {
+                Ok((k.bind(py).extract::<String>()?, v.bind(py).extract::<String>()?))
+            })
+            .collect::<PyResult<_>>()?;
+        Ok(encode_pairs(&pairs))
+    }
+
+    fn __repr__(slf: &Bound<'_, Self>) -> PyResult<String> {
+        let py = slf.py();
+        let class_name: String = slf.get_type().getattr("__name__")?.extract()?;
+        let s = Self::__str__(slf)?;
+        let repr_s = PyString::new(py, &s).repr()?;
+        Ok(format!("{class_name}({repr_s})"))
+    }
+}
