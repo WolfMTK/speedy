@@ -283,6 +283,8 @@ class _MultiMapping[Key, Value](ABC):
     def multi_items(self) -> list[tuple[Key, Value]]: ...
 
 class ImmutableMultiDict[Key, Value](_MultiMapping[Key, Value]):
+    """Immutable MultiDict."""
+
     def __init__(
         self, *args: _MultiMapping[Key, Value] | Mapping[Key, Value] | Iterable[tuple[Key, Value]], **kwargs: Any
     ) -> None: ...
@@ -334,6 +336,17 @@ class ImmutableMultiDict[Key, Value](_MultiMapping[Key, Value]):
 
     def multi_items(self) -> list[tuple[Key, Value]]:
         """Get items."""
+        ...
+
+class MultiDict(ImmutableMultiDict[Any, Any]):
+    """Dictionary with the support for duplicate keys."""
+
+    def setdefault(self, key: Any, default: Any = ...) -> Any:
+        """Set default value."""
+        ...
+
+    def setlist(self, key: Any, values: list[Any]) -> None:
+        """Set list."""
         ...
 
 # responses.rs

@@ -1280,6 +1280,15 @@ impl ImmutableMultiDict {
     }
 }
 
+fn delitem_impl(base: &mut ImmutableMultiDict, py: Python<'_>, key: &Bound<'_, PyAny>) -> PyResult<()> {
+    if !base.dict.bind(py).contains(key)? {
+        return Err(PyKeyError::new_err(key.clone().unbind()));
+    }
+    base.dict.bind(py).del_item(key)?;
+    base.stack = stack_without_key(py, &base.stack, key)?;
+    Ok(())
+}
+
 #[pymethods]
 impl ImmutableMultiDict {
     #[new]
@@ -1314,12 +1323,7 @@ impl ImmutableMultiDict {
     }
 
     fn __delitem__(&mut self, py: Python<'_>, key: &Bound<'_, PyAny>) -> PyResult<()> {
-        if !self.dict.bind(py).contains(key)? {
-            return Err(PyKeyError::new_err(key.clone().unbind()));
-        }
-        self.dict.bind(py).del_item(key)?;
-        self.stack = stack_without_key(py, &self.stack, key)?;
-        Ok(())
+        delitem_impl(self, py, key)
     }
 
     fn __contains__(&self, py: Python<'_>, key: &Bound<'_, PyAny>) -> PyResult<bool> {
@@ -1365,29 +1369,26 @@ impl ImmutableMultiDict {
     }
 
     #[pyo3(signature = (*args, **kwargs))]
-    fn update(
-        &mut self,
-        py: Python<'_>,
-        args: &Bound<'_, PyTuple>,
-        kwargs: Option<&Bound<'_, PyDict>>,
-    ) -> PyResult<()> {
+    fn update(slf: &Bound<'_, Self>, args: &Bound<'_, PyTuple>, kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<()> {
+        let py = slf.py();
         check_args_len(args.len())?;
         let arg0 = args.iter().next();
         let items = build_items(arg0.as_ref(), kwargs)?;
         let value_dict = dict_from_stack(py, &items)?;
         let value_dict = value_dict.bind(py);
 
-        let mut new_stack = Vec::with_capacity(self.stack.len() + items.len());
-        self.stack.iter().try_for_each(|(k, v)| -> PyResult<()> {
+        let mut this = slf.borrow_mut();
+        let mut new_stack = Vec::with_capacity(this.stack.len() + items.len());
+        this.stack.iter().try_for_each(|(k, v)| -> PyResult<()> {
             if !value_dict.contains(k.bind(py))? {
                 new_stack.push((k.clone_ref(py), v.clone_ref(py)));
             }
             Ok(())
         })?;
         new_stack.extend(items);
-        self.stack = new_stack;
+        this.stack = new_stack;
 
-        let self_dict = self.dict.bind(py);
+        let self_dict = this.dict.bind(py);
         value_dict.iter().try_for_each(|(k, v)| self_dict.set_item(k, v))
     }
 
@@ -1444,5 +1445,81 @@ impl ImmutableMultiDict {
 
     fn multi_items(&self, py: Python<'_>) -> PyResult<Py<PyList>> {
         Ok(stack_to_pylist(py, &self.stack)?.unbind())
+    }
+}
+
+#[pyclass(mapping, extends = ImmutableMultiDict, subclass, module = "speedy.datastructures")]
+pub struct MultiDict {}
+
+impl MultiDict {
+    fn setlist_impl(
+        base: &mut PyRefMut<'_, ImmutableMultiDict>,
+        py: Python<'_>,
+        key: Py<PyAny>,
+        values: Vec<Py<PyAny>>,
+    ) -> PyResult<()> {
+        if values.is_empty() {
+            base.stack = stack_without_key(py, &base.stack, key.bind(py))?;
+            base.dict.bind(py).call_method1("pop", (key, py.None()))?;
+        } else {
+            let mut new_stack = stack_without_key(py, &base.stack, key.bind(py))?;
+            new_stack.extend(values.iter().map(|v| (key.clone_ref(py), v.clone_ref(py))));
+            base.stack = new_stack;
+            let last = values.last().expect("checked non-empty above").clone_ref(py);
+            base.dict.bind(py).set_item(key, last)?;
+        }
+        Ok(())
+    }
+}
+
+#[pymethods]
+impl MultiDict {
+    #[new]
+    #[pyo3(signature = (*args, **kwargs))]
+    fn new(
+        py: Python<'_>,
+        args: &Bound<'_, PyTuple>,
+        kwargs: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<PyClassInitializer<MultiDict>> {
+        check_args_len(args.len())?;
+        let arg0 = if args.is_empty() { None } else { Some(args.get_item(0)?) };
+        let items = build_items(arg0.as_ref(), kwargs)?;
+        let base = ImmutableMultiDict::from_stack(py, items)?;
+        Ok(PyClassInitializer::from(base).add_subclass(MultiDict {}))
+    }
+
+    fn __setitem__(self_: PyRefMut<'_, Self>, py: Python<'_>, key: Py<PyAny>, value: Py<PyAny>) -> PyResult<()> {
+        let mut base = self_.into_super();
+        Self::setlist_impl(&mut base, py, key, vec![value])
+    }
+
+    fn __delitem__(self_: PyRefMut<'_, Self>, py: Python<'_>, key: &Bound<'_, PyAny>) -> PyResult<()> {
+        let mut base = self_.into_super();
+        delitem_impl(&mut base, py, key)
+    }
+
+    fn setlist(self_: PyRefMut<'_, Self>, py: Python<'_>, key: Py<PyAny>, values: &Bound<'_, PyAny>) -> PyResult<()> {
+        let values_vec = pyobj_to_vec(values)?;
+        let mut base = self_.into_super();
+        Self::setlist_impl(&mut base, py, key, values_vec)
+    }
+
+    #[pyo3(signature = (key, default=None))]
+    fn setdefault(
+        self_: PyRefMut<'_, Self>,
+        py: Python<'_>,
+        key: Py<PyAny>,
+        default: Option<Py<PyAny>>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut base = self_.into_super();
+        let key_bound = key.bind(py).clone();
+        if let Some(value) = base.dict.bind(py).get_item(&key_bound)? {
+            Ok(value.unbind())
+        } else {
+            let default_value = default.unwrap_or_else(|| py.None());
+            base.stack.push((key.clone_ref(py), default_value.clone_ref(py)));
+            base.dict.bind(py).set_item(key, default_value.clone_ref(py))?;
+            Ok(default_value)
+        }
     }
 }
