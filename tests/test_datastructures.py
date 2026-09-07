@@ -615,6 +615,33 @@ class TestURLPath:
     def test_url_path_repr(self, base: str, path: str) -> None:
         assert repr(URLPath(path, base)) == f"URLPath(path={path!r}, base={base!r})"
 
+    def test_matches_str(self) -> None:
+        url_path = URLPath("/foo/bar?a=1", "https://example.org:8000")
+        assert url_path.make_absolute_url() == str(url_path)
+
+    def test_returns_url(self) -> None:
+        url_path = URLPath("/foo/bar?a=1", "https://example.org:8000")
+        result = url_path.make_absolute_url()
+        assert isinstance(result, URL)
+        assert result.scheme == "https"
+        assert result.path == "/foo/bar"
+        assert result.query == "a=1"
+
+    def test_overrides_base_url(self) -> None:
+        url_path = URLPath("/foo", "https://example.org")
+        other = URL("http://other.example:9000")
+        assert url_path.make_absolute_url(base_url=other) == "http://other.example:9000/foo"
+
+    def test_overrides_base_str(self) -> None:
+        url_path = URLPath("/foo", "https://example.org")
+        assert url_path.make_absolute_url(base_url="https://third.example") == "https://third.example/foo"
+
+    def test_base_not_mutated(self) -> None:
+        url_path = URLPath("/foo", "https://example.org")
+        url_path.make_absolute_url(base_url="https://other.example")
+        assert str(url_path) == "https://example.org/foo"
+        assert str(url_path.base) == "https://example.org"
+
 
 class TestHeaders:
     def test_headers(self) -> None:
