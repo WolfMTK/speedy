@@ -15,3 +15,4 @@ url = "2.5.8"
 cookie = { version = "0.18.2", features = ["percent-encode"] }
 time = "0.3.55"
 tempfile = "3.27.0"
+regex = "1.13.1"
