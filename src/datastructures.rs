@@ -240,9 +240,9 @@ impl State {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Address {
     #[pyo3(get)]
-    host: String,
+    pub(crate) host: String,
     #[pyo3(get)]
-    port: u16,
+    pub(crate) port: u16,
 }
 
 impl Address {
@@ -810,22 +810,21 @@ pub struct URLPath {
 }
 
 impl URLPath {
-    fn base_scheme_netloc_path(&self, py: Python<'_>) -> PyResult<URL> {
-        let base = self.base.bind(py);
+    fn resolve_base(base: &Bound<'_, PyAny>) -> PyResult<URL> {
         if let Ok(url) = base.extract::<PyRef<'_, URL>>() {
             return Ok(url.to_owned());
         }
         let raw: String = base.str()?.extract()?;
-        let url = split_url(&raw);
-        Ok(url)
+        Ok(split_url(&raw))
     }
 
-    fn make_absolute_url(&self, py: Python<'_>) -> PyResult<String> {
-        let url = self.base_scheme_netloc_path(py)?;
+    fn build_absolute_url(&self, py: Python<'_>, base: &Bound<'_, PyAny>) -> PyResult<URL> {
+        let url = Self::resolve_base(base)?;
         let trimmed_base_path = url.path.trim_end_matches('/');
         let path_str: String = self.path.bind(py).str()?.extract()?;
         let combined_path = format!("{trimmed_base_path}{path_str}");
-        Ok(unsplit_url(&url.scheme, &url.netloc, &combined_path, "", ""))
+        let full = unsplit_url(&url.scheme, &url.netloc, &combined_path, "", "");
+        Ok(split_url(&full))
     }
 }
 
@@ -837,13 +836,21 @@ impl URLPath {
     }
 
     fn __str__(&self, py: Python<'_>) -> PyResult<String> {
-        self.make_absolute_url(py)
+        Ok(self.build_absolute_url(py, self.base.bind(py))?.__str__())
     }
 
     fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
         let path_repr = self.path.bind(py).repr()?;
         let base_repr = self.base.bind(py).repr()?;
         Ok(format!("URLPath(path={path_repr}, base={base_repr})"))
+    }
+
+    #[pyo3(signature = (base_url=None))]
+    fn make_absolute_url(&self, py: Python<'_>, base_url: Option<&Bound<'_, PyAny>>) -> PyResult<URL> {
+        match base_url {
+            Some(base) => self.build_absolute_url(py, base),
+            None => self.build_absolute_url(py, self.base.bind(py)),
+        }
     }
 }
 
@@ -1747,4 +1754,65 @@ impl UploadFile {
         self.storage = Storage::Memory(Cursor::new(Vec::new()));
         Ok(())
     }
+}
+
+pub(crate) fn url_from_scope(scope: &Bound<'_, PyDict>) -> PyResult<URL> {
+    let scheme: String = scope
+        .get_item("scheme")?
+        .map(|v| v.extract::<String>())
+        .transpose()?
+        .unwrap_or_else(|| "http".to_string());
+
+    let path: String = scope
+        .get_item("path")?
+        .ok_or_else(|| PyAttributeError::new_err("scope missing 'path'"))?
+        .extract()?;
+
+    let query_string: Vec<u8> = scope
+        .get_item("query_string")?
+        .map(|v| v.extract::<Vec<u8>>())
+        .transpose()?
+        .unwrap_or_default();
+
+    let host_header: Option<String> = match scope.get_item("headers")? {
+        Some(headers) => headers
+            .cast::<PyList>()?
+            .iter()
+            .find_map(|item| match item.extract::<(Vec<u8>, Vec<u8>)>() {
+                Ok((k, v)) if k.eq_ignore_ascii_case(b"host") => Some(Ok(v)),
+                Ok(_) => None,
+                Err(e) => Some(Err(e)),
+            })
+            .transpose()?
+            .map(|v| String::from_utf8_lossy(&v).into_owned()),
+        None => None,
+    };
+
+    const DEFAULT_PORTS: [(&str, u16); 4] = [("http", 80), ("https", 443), ("ws", 80), ("wss", 443)];
+
+    let raw_url = if let Some(host) = host_header {
+        format!("{scheme}://{host}{path}")
+    } else {
+        match scope.get_item("server")? {
+            None => path.clone(),
+            Some(server) if server.is_none() => path.clone(),
+            Some(server) => {
+                let (host, port): (String, u16) = server.extract()?;
+                let default_port = DEFAULT_PORTS.iter().find(|(s, _)| *s == scheme).map(|(_, p)| *p);
+                if Some(port) == default_port {
+                    format!("{scheme}://{host}{path}")
+                } else {
+                    format!("{scheme}://{host}:{port}{path}")
+                }
+            }
+        }
+    };
+
+    let final_url = if query_string.is_empty() {
+        raw_url
+    } else {
+        format!("{raw_url}?{}", String::from_utf8_lossy(&query_string))
+    };
+
+    Ok(split_url(&final_url))
 }

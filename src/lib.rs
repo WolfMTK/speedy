@@ -1,4 +1,6 @@
+mod _multipart;
 mod datastructures;
+mod requests;
 mod responses;
 
 use pyo3::prelude::*;
@@ -7,6 +9,8 @@ use pyo3::prelude::*;
 mod _speedy {
     use pyo3::prelude::*;
 
+    #[pymodule_export]
+    use crate::_multipart::{MultiPartFormParser, parse_content_header};
     #[pymodule_export]
     use crate::datastructures::{
         Address, Headers, ImmutableMultiDict, ImmutableState, MultiDict, MutableHeaders, QueryParams, State, URL,
