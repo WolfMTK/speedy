@@ -4,3 +4,7 @@ class ApplicationException(Exception):
 
 class StateException(ApplicationException):
     """State exception."""
+
+
+class ValidationException(ApplicationException):
+    """Validation exception."""
