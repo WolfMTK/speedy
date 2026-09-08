@@ -1,7 +1,8 @@
 import functools
 import sys
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Iterator
-from typing import Any, TypeGuard
+from collections.abc import AsyncIterator, Awaitable, Callable, Generator, Iterable, Iterator
+from contextlib import AbstractAsyncContextManager
+from typing import Any, Protocol, TypeGuard, TypeVar
 
 import anyio.to_thread
 
@@ -59,3 +60,30 @@ class AsyncCallable[**P, T]:
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> Awaitable[T]:
         return run_in_threadpool(self.function, *args, **kwargs)
+
+
+class AwaitableOrContextManager[T_co](Awaitable[T_co], AbstractAsyncContextManager[T_co], Protocol[T_co]): ...
+
+
+class SupportsAsyncClose(Protocol):
+    async def close(self) -> None: ...
+
+
+SupportsAsyncCloseType = TypeVar("SupportsAsyncCloseType", bound=SupportsAsyncClose)
+
+
+class AwaitableOrContextManagerWrapper:
+    __slots__ = ("aw", "entered")
+
+    def __init__(self, aw: Awaitable[Any]) -> None:
+        self.aw = aw
+
+    def __await__(self) -> Generator[Any, None, Any]:
+        return self.aw.__await__()
+
+    async def __aenter__(self) -> Any:
+        self.entered = await self.aw
+        return self.entered
+
+    async def __aexit__(self, *args: Any) -> None:
+        await self.entered.close()
