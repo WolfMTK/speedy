@@ -14,6 +14,7 @@ from speedy.concurrency import run_in_threadpool
 __all__ = [
     "URL",
     "Address",
+    "FormMultiDict",
     "Headers",
     "ImmutableMultiDict",
     "ImmutableState",
@@ -52,3 +53,13 @@ class UploadFile(_UploadFile):
             await run_in_threadpool(self._close_sync)
             return
         self._close_sync()
+
+
+class FormMultiDict(ImmutableMultiDict):
+    """MultiDict for form data."""
+
+    async def close(self) -> None:
+        """Close all files in the multi-dict."""
+        for _, value in self.multi_items():
+            if isinstance(value, UploadFile):
+                await value.close()

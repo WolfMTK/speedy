@@ -3,6 +3,8 @@ import sys
 from copy import copy, deepcopy
 from typing import Any, Iterator, Mapping
 
+from pytest_mock import MockFixture
+
 import pytest
 from speedy.datastructures import (
     URL,
@@ -16,6 +18,7 @@ from speedy.datastructures import (
     MultiDict,
     QueryParams,
     UploadFile,
+    FormMultiDict,
 )
 from speedy.exceptions import StateException
 
@@ -1015,3 +1018,18 @@ class TestUploadFile:
         assert repr(file) == "UploadFile(filename='file', headers={})"
         file = UploadFile(filename='file', file_data=b'', size=0, headers={'content-type': 'video/mp4'})
         assert repr(file) == "UploadFile(filename='file', headers={'content-type': 'video/mp4'})"
+
+
+class TestFormMultiDict:
+    async def test_form_multi_dict_close(self, mocker: MockFixture) -> None:
+        close = mocker.patch('speedy.datastructures.UploadFile.close')
+
+        multi = FormMultiDict(
+            [
+                ('foo', UploadFile(filename='foo')),
+                ('bar', UploadFile(filename='bar')),
+            ]
+        )
+        await multi.close()
+
+        assert close.call_count == 2
