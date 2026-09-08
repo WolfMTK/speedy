@@ -8,3 +8,7 @@ class StateException(ApplicationException):
 
 class ValidationException(ApplicationException):
     """Validation exception."""
+
+
+class ClientDisconnect(ApplicationException):
+    """Client disconnect."""
