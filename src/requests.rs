@@ -1,12 +1,18 @@
-// TODO: if the implementation doesn't work, move if to the Python side
-
 use cookie::Cookie;
-use pyo3::PyTypeCheck;
-use pyo3::exceptions::{PyAssertionError, PyKeyError, PyRuntimeError};
+use pyo3::exceptions::{PyAssertionError, PyKeyError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict};
+use pyo3::types::{PyBytes, PyDict, PyList, PyString};
+use pyo3::{PyTypeCheck, create_exception};
+use url::form_urlencoded;
 
 use crate::datastructures::{Address, Headers, QueryParams, State, URL, get_raw_from_inputs, url_from_scope};
+
+create_exception!(
+    speedy._speedy,
+    JSONDecodeError,
+    PyValueError,
+    "Raised when JSON decoding fails; shaped like json.JSONDecodeError."
+);
 
 fn downcast_to_py<T: PyTypeCheck>(obj: &Bound<'_, PyAny>) -> PyResult<Py<T>> {
     Ok(obj.cast::<T>()?.clone().unbind())
@@ -282,4 +288,169 @@ impl HTTPConnection {
         let absolute = url_path.call_method1("make_absolute_url", (base_url,))?;
         downcast_to_py::<URL>(&absolute)
     }
+
+    #[getter]
+    fn scope(&self, py: Python<'_>) -> Py<PyDict> {
+        self.scope.clone_ref(py)
+    }
+}
+
+#[pyclass(extends = HTTPConnection, subclass, module = "speedy.requests")]
+pub struct Request {
+    receive: Py<PyAny>,
+    send: Py<PyAny>,
+}
+
+#[pymethods]
+impl Request {
+    #[new]
+    fn new(
+        py: Python<'_>,
+        scope: Py<PyDict>,
+        receive: Py<PyAny>,
+        send: Py<PyAny>,
+    ) -> PyResult<PyClassInitializer<Request>> {
+        let scope_type: String = scope
+            .bind(py)
+            .get_item("type")?
+            .ok_or_else(|| PyKeyError::new_err("type"))?
+            .extract()?;
+        if scope_type != "http" {
+            return Err(PyAssertionError::new_err(()));
+        }
+        let base = HTTPConnection::new(py, scope, None)?;
+        Ok(PyClassInitializer::from(base).add_subclass(Request { receive, send }))
+    }
+
+    #[getter]
+    fn method(slf: &Bound<'_, Self>, py: Python<'_>) -> PyResult<String> {
+        let base = slf.borrow().into_super();
+        base.scope
+            .bind(py)
+            .get_item("method")?
+            .ok_or_else(|| PyKeyError::new_err("method"))?
+            .extract()
+    }
+
+    #[getter]
+    fn receive(&self, py: Python<'_>) -> Py<PyAny> {
+        self.receive.clone_ref(py)
+    }
+
+    #[getter(_send)]
+    fn get_send(&self, py: Python<'_>) -> Py<PyAny> {
+        self.send.clone_ref(py)
+    }
+}
+
+fn char_offset_for_line_col(text: &str, line: usize, column: usize) -> usize {
+    let line_start = if line <= 1 {
+        0
+    } else {
+        text.chars()
+            .enumerate()
+            .filter(|&(_, ch)| ch == '\n')
+            .nth(line - 2)
+            .map(|(idx, _)| idx + 1)
+            .unwrap_or_else(|| text.chars().count())
+    };
+    line_start + column.saturating_sub(1)
+}
+
+fn json_decode_error(py: Python<'_>, msg: &str, doc: &str, pos: usize) -> PyErr {
+    let bounded_pos = pos.min(doc.len());
+    let lineno = doc[..bounded_pos].matches('\n').count() + 1;
+    let colno = match doc[..bounded_pos].rfind('\n') {
+        Some(idx) => bounded_pos - idx,
+        None => bounded_pos + 1,
+    };
+    let errmsg = format!("{msg}: line {lineno} column {colno} (char {pos})");
+
+    let err = JSONDecodeError::new_err(errmsg);
+    let value = err.value(py);
+    let _ = value.setattr("msg", msg);
+    let _ = value.setattr("doc", doc);
+    let _ = value.setattr("pos", pos);
+    let _ = value.setattr("lineno", lineno);
+    let _ = value.setattr("colno", colno);
+    err
+}
+
+fn big_int_from_decimal_str(py: Python<'_>, s: &str) -> PyResult<Py<PyAny>> {
+    let (negative, digits) = match s.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, s),
+    };
+    if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(PyValueError::new_err(format!("invalid integer literal in JSON number: {s:?}")));
+    }
+
+    let ten = 10i32.into_pyobject(py)?.into_any();
+    let acc = digits
+        .bytes()
+        .try_fold(0i32.into_pyobject(py)?.into_any().unbind(), |acc, byte| {
+            let digit = (byte - b'0') as i32;
+            PyResult::Ok(acc.bind(py).mul(&ten)?.add(digit.into_pyobject(py)?)?.unbind())
+        })?;
+
+    Ok(if negative {
+        acc.bind(py).call_method0("__neg__")?.unbind()
+    } else {
+        acc
+    })
+}
+
+fn json_number_to_py(py: Python<'_>, n: &serde_json::Number) -> PyResult<Py<PyAny>> {
+    if let Some(v) = n.as_i64() {
+        return Ok(v.into_pyobject(py)?.into_any().unbind());
+    }
+    if let Some(v) = n.as_u64() {
+        return Ok(v.into_pyobject(py)?.into_any().unbind());
+    }
+    if let Some(v) = n.as_f64() {
+        if n.to_string().contains(['.', 'e', 'E']) {
+            return Ok(v.into_pyobject(py)?.into_any().unbind());
+        }
+    }
+    big_int_from_decimal_str(py, &n.to_string())
+}
+
+fn json_value_to_py(py: Python<'_>, value: &serde_json::Value) -> PyResult<Py<PyAny>> {
+    match value {
+        serde_json::Value::Null => Ok(py.None()),
+        serde_json::Value::Bool(b) => Ok(b.into_pyobject(py)?.to_owned().into_any().unbind()),
+        serde_json::Value::Number(n) => json_number_to_py(py, n),
+        serde_json::Value::String(s) => Ok(PyString::new(py, s).into_any().unbind()),
+        serde_json::Value::Array(items) => {
+            let converted = items
+                .iter()
+                .map(|v| json_value_to_py(py, v))
+                .collect::<PyResult<Vec<_>>>()?;
+            Ok(PyList::new(py, converted)?.into_any().unbind())
+        }
+        serde_json::Value::Object(map) => {
+            let dict = PyDict::new(py);
+            map.iter()
+                .try_for_each(|(k, v)| dict.set_item(k, json_value_to_py(py, v)?))?;
+            Ok(dict.into_any().unbind())
+        }
+    }
+}
+
+#[pyfunction]
+pub fn parse_json(py: Python<'_>, body: &[u8]) -> PyResult<Py<PyAny>> {
+    let text = std::str::from_utf8(body).map_err(|e| json_decode_error(py, &format!("invalid utf-8: {e}"), "", 0))?;
+    serde_json::from_str::<serde_json::Value>(text)
+        .map_err(|e| {
+            let pos = char_offset_for_line_col(text, e.line(), e.column());
+            json_decode_error(py, &e.to_string(), text, pos)
+        })
+        .and_then(|value| json_value_to_py(py, &value))
+}
+
+#[pyfunction]
+pub fn parse_urlencoded_form(body: &[u8]) -> Vec<(String, String)> {
+    form_urlencoded::parse(body)
+        .map(|(k, v)| (k.into_owned(), v.into_owned()))
+        .collect()
 }

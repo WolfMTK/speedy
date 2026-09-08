@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Literal, NamedTuple, Self
 
 from speedy.background import BackgroundTask
-from speedy.types import RawHeaders
+from speedy.types import HTTPScope, RawHeaders, Receive, Send, WebSocketScope
 
 # datastructures.rs
 class ImmutableState(Mapping[str, Any]):
@@ -467,3 +467,124 @@ class MultiPartFormParser:
     def parse(self) -> dict[str, Any]:
         """Parse multipart form data."""
         ...
+
+# requests.rs
+class HTTPConnection(Mapping[str, Any]):
+    """A base class for incoming HTTP connections."""
+
+    def __init__(self, scope: HTTPScope | WebSocketScope, receive: Receive | None = ...) -> None: ...
+    def __getitem__(self, key: str) -> Any: ...
+    def __iter__(self) -> Iterator[str]: ...
+    def __len__(self) -> int: ...
+    def __contains__(self, key: object) -> bool: ...
+    def keys(self) -> KeysView[str]:
+        """Get keys."""
+        ...
+
+    def values(self) -> ValuesView[Any]:
+        """Get values."""
+        ...
+
+    def items(self) -> ItemsView[str, Any]:
+        """Get items."""
+        ...
+
+    @property
+    def scope(self) -> HTTPScope | WebSocketScope:
+        """Get the scope."""
+        ...
+
+    @property
+    def app(self) -> Any:
+        """Get the app."""
+        ...
+
+    @property
+    def url(self) -> URL:
+        """Get the url."""
+        ...
+
+    @property
+    def base_url(self) -> URL:
+        """Get the base url."""
+        ...
+
+    @property
+    def headers(self) -> Headers:
+        """Get the headers."""
+        ...
+
+    @property
+    def query_params(self) -> QueryParams:
+        """Get the query params."""
+        ...
+
+    @property
+    def path_params(self) -> dict[str, Any]:
+        """Get the path and query params."""
+        ...
+
+    @property
+    def cookies(self) -> dict[str, str]:
+        """Get the cookies."""
+        ...
+
+    @property
+    def client(self) -> Address | None:
+        """Get the client."""
+        ...
+
+    @property
+    def session(self) -> Any:
+        """Get the session (requires SessionMiddleware)."""
+        ...
+
+    @property
+    def auth(self) -> Any:
+        """Get the auth (requires AuthenticationMiddleware)."""
+        ...
+
+    @property
+    def user(self) -> Any:
+        """Get the user (requires AuthenticationMiddleware)."""
+        ...
+
+    @property
+    def state(self) -> State:
+        """Get the state."""
+        ...
+
+    def url_for(self, name: str, **path_params: Any) -> URL:
+        """Build the url for a named route."""
+        ...
+
+class Request(HTTPConnection):
+    """An HTTP request."""
+
+    def __new__(cls, scope: HTTPScope, receive: Receive, send: Send) -> Self: ...
+    @property
+    def method(self) -> str:
+        """Get the method."""
+        ...
+
+    @property
+    def receive(self) -> Receive:
+        """Get the receive callable."""
+        ...
+    @property
+    def _send(self) -> Send: ...
+
+class JSONDecodeError(ValueError):
+    """A JSON decoding error, shaped like `json.JSONDecodeError`."""
+
+    msg: str
+    doc: str
+    pos: int
+    lineno: int
+    colno: int
+
+def parse_json(body: bytes) -> Any:
+    """Parse a JSON request body."""
+
+def parse_urlencoded_form(body: bytes) -> list[tuple[str, str]]:
+    """Parse body into flat pairs."""
