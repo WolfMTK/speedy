@@ -15,7 +15,7 @@ class BackgroundTask[**P]:
         if self.is_async:
             await self.func(*self.args, **self.kwargs)
         else:
-            await run_in_threadpool(self.func, self.args, **self.kwargs)
+            await run_in_threadpool(self.func, *self.args, **self.kwargs)
 
 
 class BackgroundTasks[**P]:
