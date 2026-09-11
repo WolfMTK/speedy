@@ -383,6 +383,15 @@ class UploadFile:
     def _size_sync(self) -> int: ...
     def _close_sync(self) -> None: ...
 
+class QueryParams(ImmutableMultiDict[str, str]):
+    """An immutable multi-dict of URL query parameters, parsed from a query string."""
+
+    def __init__(
+        self, *args: ImmutableMultiDict[Any, Any] | list[tuple[Any, Any]] | str | bytes, **kwargs: Any
+    ) -> None: ...
+    def __str__(self) -> str: ...
+    def __repr__(self) -> str: ...
+
 # responses.rs
 class Response:
     """An HTTP response."""
@@ -442,18 +451,43 @@ class Response:
         """Delete a cookie by expiring it immediately."""
         ...
 
-class QueryParams(ImmutableMultiDict[str, str]):
-    """An immutable multi-dict of URL query parameters, parsed from a query string."""
+def dump_json(content: Any) -> bytes:
+    """Serialize content to compact JSON bytes."""
+    ...
 
-    def __init__(
-        self, *args: ImmutableMultiDict[Any, Any] | list[tuple[Any, Any]] | str | bytes, **kwargs: Any
-    ) -> None: ...
-    def __str__(self) -> str: ...
-    def __repr__(self) -> str: ...
+class MalformedRangeHeader(Exception):
+    """A malformed Range header."""
+
+    content: str
+
+class RangeNotSatisfiable(Exception):
+    """A Range header that can't be satisfied."""
+
+    max_size: int
+
+def parse_range_header(range_header: str, file_size: int, max_ranges: int) -> list[tuple[int, int]]:
+    """Parse and validate a Range header into merged byte ranges."""
+    ...
 
 # _multipart.rs
 def parse_content_header(value: str) -> tuple[str, dict[str, str]]:
     """Parse content-type and content-disposition header values."""
+    ...
+
+def compute_etag(mtime: float, size: int) -> str:
+    """Compute a quoted ETag from a file's mtime and size."""
+    ...
+
+def multipart_content_length(ranges: list[tuple[int, int]], boundary: str, max_size: int, content_type: str) -> int:
+    """Total Content-Length for a multipart/byteranges response."""
+    ...
+
+def multipart_range_header(boundary: str, content_type: str, start: int, end: int, max_size: int) -> bytes:
+    """Per-part header for one range of a multipart/byteranges response."""
+    ...
+
+def multipart_closing_boundary(boundary: str) -> bytes:
+    """The closing boundary for a multipart/byteranges response."""
     ...
 
 class MultiPartFormParser:
@@ -571,6 +605,7 @@ class Request(HTTPConnection):
     def receive(self) -> Receive:
         """Get the receive callable."""
         ...
+
     @property
     def _send(self) -> Send: ...
 
