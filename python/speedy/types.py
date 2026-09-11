@@ -1,9 +1,8 @@
-from collections.abc import Awaitable, Callable, Iterable, Sequence
+from collections.abc import AsyncIterable, Awaitable, Callable, Iterable, Sequence
 from contextlib import AbstractAsyncContextManager
 from typing import Any, Literal, NotRequired, TypedDict
 
 from speedy.enums import HTTPMethod, ScopeType
-from speedy.protocols import IRequest, IResponse
 
 type HTTPMethodName = Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD", "TRACE", "OPTIONS"]
 
@@ -278,3 +277,11 @@ type ExceptionHandler = HTTPExceptionHandler
 type Lifespan = Sequence[Callable[[ASGIApplication], AbstractAsyncContextManager] | AbstractAsyncContextManager]
 
 type RawHeaders = list[tuple[bytes, bytes]]
+
+type Content = str | bytes | memoryview
+
+type SyncContentStream = Iterable[Content]
+
+type AsyncContentStream = AsyncIterable[Content]
+
+type ContentStream = AsyncContentStream | SyncContentStream
