@@ -1,7 +1,7 @@
 import functools
 import sys
-from collections.abc import AsyncIterator, Awaitable, Callable, Generator, Iterable, Iterator
-from contextlib import AbstractAsyncContextManager
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Generator, Iterable, Iterator
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import Any, Protocol, TypeGuard, TypeVar
 
 import anyio.to_thread
@@ -87,3 +87,17 @@ class AwaitableOrContextManagerWrapper:
 
     async def __aexit__(self, *args: Any) -> None:
         await self.entered.close()
+
+
+@asynccontextmanager
+async def create_collapsing_task_group() -> AsyncGenerator[anyio.abc.TaskGroup, None]:
+    try:
+        async with anyio.create_task_group() as tg:
+            yield tg
+    except BaseExceptionGroup as excs:
+        if len(excs.exceptions) != 1:
+            raise
+
+        exc = excs.exceptions[0]
+        context = None if exc.__suppress_context__ else exc.__context__
+        raise exc from exc.__cause__ or context
