@@ -19,7 +19,10 @@ mod _speedy {
     #[pymodule_export]
     use crate::requests::{HTTPConnection, Request, parse_json, parse_urlencoded_form};
     #[pymodule_export]
-    use crate::responses::Response;
+    use crate::responses::{
+        Response, compute_etag, dump_json, multipart_closing_boundary, multipart_content_length,
+        multipart_range_header, parse_range_header,
+    };
 
     #[pymodule_init]
     fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -28,6 +31,8 @@ mod _speedy {
         mapping_abc.call_method1("register", (m.getattr("Headers")?,))?;
         mapping_abc.call_method1("register", (m.getattr("HTTPConnection")?,))?;
         m.add("JSONDecodeError", py.get_type::<crate::requests::JSONDecodeError>())?;
+        m.add("MalformedRangeHeader", py.get_type::<crate::responses::MalformedRangeHeader>())?;
+        m.add("RangeNotSatisfiable", py.get_type::<crate::responses::RangeNotSatisfiable>())?;
         Ok(())
     }
 }
