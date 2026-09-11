@@ -1,8 +1,13 @@
 from collections.abc import AsyncIterable, Awaitable, Callable, Iterable, Sequence
 from contextlib import AbstractAsyncContextManager
-from typing import Any, Literal, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
 
 from speedy.enums import HTTPMethod, ScopeType
+
+if TYPE_CHECKING:
+    from speedy.requests import Request
+    from speedy.responses import Response
+
 
 type HTTPMethodName = Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD", "TRACE", "OPTIONS"]
 
@@ -270,7 +275,7 @@ type ASGIApplication = Callable[
 
 type Middleware = Callable[..., ASGIApplication]
 
-type HTTPExceptionHandler = Callable[[IRequest, Exception], IResponse]
+type HTTPExceptionHandler = Callable[[Request, Exception], Response]
 
 type ExceptionHandler = HTTPExceptionHandler
 
