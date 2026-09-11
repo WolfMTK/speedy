@@ -469,7 +469,6 @@ def parse_range_header(range_header: str, file_size: int, max_ranges: int) -> li
     """Parse and validate a Range header into merged byte ranges."""
     ...
 
-# _multipart.rs
 def parse_content_header(value: str) -> tuple[str, dict[str, str]]:
     """Parse content-type and content-disposition header values."""
     ...
@@ -490,6 +489,7 @@ def multipart_closing_boundary(boundary: str) -> bytes:
     """The closing boundary for a multipart/byteranges response."""
     ...
 
+# _multipart.rs
 class MultiPartFormParser:
     """The parser multipart form data."""
 
