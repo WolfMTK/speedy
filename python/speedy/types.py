@@ -2,9 +2,8 @@ from collections.abc import AsyncGenerator, AsyncIterable, Awaitable, Callable, 
 from contextlib import AbstractAsyncContextManager
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
 
-from speedy.enums import HTTPMethod, ScopeType
-
 if TYPE_CHECKING:
+    from speedy.enums import HTTPMethod
     from speedy.requests import Request
     from speedy.responses import Response
     from speedy.websocket import WebSocket
@@ -51,21 +50,21 @@ class BaseScope(TypedDict):
 class HTTPScope(BaseScope):
     """HTTP-ASGI scope."""
 
-    type: Literal[ScopeType.HTTP]
+    type: Literal["ScopeType.HTTP"]
     method: str | Method
 
 
 class WebSocketScope(BaseScope):
     """WebSocket-ASGI scope."""
 
-    type: Literal[ScopeType.WEBSOCKET]
+    type: Literal["ScopeType.WEBSOCKET"]
     subprotocols: Iterable[str]
 
 
 class LifespanScope(TypedDict):
     """Lifespan-ASGI scope."""
 
-    type: Literal[ScopeType.LIFESPAN]
+    type: Literal["ScopeType.LIFESPAN"]
     asgi: ASGIVersion
     state: NotRequired[dict[str, Any]]
 
