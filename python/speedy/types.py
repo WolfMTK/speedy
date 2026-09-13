@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Awaitable, Callable, Iterable, Sequence
+from collections.abc import AsyncGenerator, AsyncIterable, Awaitable, Callable, Iterable, MutableMapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
 
@@ -7,6 +7,7 @@ from speedy.enums import HTTPMethod, ScopeType
 if TYPE_CHECKING:
     from speedy.requests import Request
     from speedy.responses import Response
+    from speedy.websocket import WebSocket
 
 
 type HTTPMethodName = Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD", "TRACE", "OPTIONS"]
@@ -287,6 +288,18 @@ type Content = str | bytes | memoryview
 
 type SyncContentStream = Iterable[Content]
 
-type AsyncContentStream = AsyncIterable[Content]
-
 type ContentStream = AsyncContentStream | SyncContentStream
+
+type RequestResponseEndpoint = Callable[[Request], Awaitable[Response]]
+
+type DispatchFunction = Callable[[Request, RequestResponseEndpoint], Awaitable[Response]]
+
+type BodyStreamGenerator = AsyncGenerator[bytes | MutableMapping[str, Any], None]
+
+type AsyncContentStream = AsyncIterable[Content | MutableMapping[str, Any]]
+
+type ExceptionHandlers = dict[type[Exception], ExceptionHandler]
+
+type StatusHandlers = dict[int, ExceptionHandler]
+
+type WebSocketExceptionHandler = Callable[[WebSocket, Exception], Awaitable[None] | None]
