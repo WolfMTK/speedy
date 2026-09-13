@@ -1,5 +1,4 @@
 import contextlib
-import inspect
 import io
 import json
 import math
@@ -7,50 +6,23 @@ from collections.abc import Awaitable, Callable, Generator, Iterable, Mapping, S
 from concurrent.futures import Future
 from contextlib import AbstractContextManager
 from types import GeneratorType
-from typing import (
-    Any,
-    Literal,
-    Self,
-    TypedDict,
-    TypeGuard,
-    cast,
-)
+from typing import Any, Literal, Self, TypedDict, cast
 from urllib.parse import unquote, urljoin
 
 import anyio
 import httpx2
 from anyio.streams.stapled import StapledObjectStream
 
-from speedy.concurrency import is_async_callable
 from speedy.exceptions import WebSocketDisconnect
-from speedy.types import ASGIApplication, Message, Receive, Scope, Send
+from speedy.types import Message, Receive, Scope, Send
 
 _PortalFactoryType = Callable[[], AbstractContextManager[anyio.from_thread.BlockingPortal]]
 
-ASGIInstance = Callable[[Receive, Send], Awaitable[None]]
-ASGI2App = Callable[[Scope], ASGIInstance]
 ASGI3App = Callable[[Scope, Receive, Send], Awaitable[None]]
 
 _RequestData = Mapping[str, str | Iterable[str] | bytes]
 
-
-def _is_asgi3(app: ASGI2App | ASGI3App) -> TypeGuard[ASGI3App]:
-    if inspect.isclass(app):
-        return hasattr(app, "__await__")
-    return is_async_callable(app)
-
-
-class _WrapASGI2:
-    """
-    Provide an ASGI3 interface onto an ASGI2 app.
-    """
-
-    def __init__(self, app: ASGI2App) -> None:
-        self.app = app
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        instance = self.app(scope)
-        await instance(receive, send)
+_DEFAULT_PORTS = {"http": 80, "ws": 80, "https": 443, "wss": 443}
 
 
 class _AsyncBackend(TypedDict):
@@ -82,9 +54,9 @@ class WebSocketTestSession:
     ) -> None:
         self.app = app
         self.scope = scope
-        self.accepted_subprotocol = None
+        self.accepted_subprotocol: str | None = None
+        self.extra_headers: list[tuple[bytes, bytes]] | None = None
         self.portal_factory = portal_factory
-        self.extra_headers = None
 
     def __enter__(self) -> Self:
         with contextlib.ExitStack() as stack:
@@ -105,9 +77,6 @@ class WebSocketTestSession:
         return self.exit_stack.__exit__(*args)
 
     async def _run(self, *, task_status: anyio.abc.TaskStatus[anyio.CancelScope]) -> None:
-        """
-        The sub-thread in which the websocket session runs.
-        """
         send_tx, send_rx = anyio.create_memory_object_stream[Message](math.inf)
         receive_tx, receive_rx = anyio.create_memory_object_stream[Message](math.inf)
         with send_tx, send_rx, receive_tx, receive_rx, anyio.CancelScope() as cs:
@@ -197,17 +166,12 @@ class _TestClientTransport(httpx2.BaseTransport):
         raw_path = request.url.raw_path
         query = request.url.query.decode(encoding="ascii")
 
-        default_port = {"http": 80, "ws": 80, "https": 443, "wss": 443}[scheme]
         port = request.url.port
         if port is None:
-            port = default_port
+            port = _DEFAULT_PORTS[scheme]
 
-        if "host" in request.headers:
-            headers: list[tuple[bytes, bytes]] = []
-        else:
-            headers = [(b"host", request.url.netloc)]
-
-        headers += [(key.lower().encode(), value.encode()) for key, value in request.headers.multi_items()]
+        host_header = [] if "host" in request.headers else [(b"host", request.url.netloc)]
+        headers = host_header + [(key.lower().encode(), value.encode()) for key, value in request.headers.multi_items()]
 
         scope: dict[str, Any]
 
@@ -309,9 +273,9 @@ class _TestClientTransport(httpx2.BaseTransport):
             with self.portal_factory() as portal:
                 response_complete = portal.call(anyio.Event)
                 portal.call(self.app, scope, receive, send)
-        except BaseException as exc:
+        except BaseException:
             if self.raise_server_exceptions:
-                raise exc
+                raise
 
         if self.raise_server_exceptions:
             assert response_started, "TestClient did not receive any response."
@@ -341,7 +305,7 @@ class TestClient(httpx2.Client):
 
     def __init__(
         self,
-        app: ASGIApplication,
+        app: ASGI3App,
         base_url: str = "http://testserver",
         raise_server_exceptions: bool = True,
         root_path: str = "",
@@ -353,12 +317,7 @@ class TestClient(httpx2.Client):
         client: tuple[str, int] = ("testclient", 50000),
     ) -> None:
         self.async_backend = _AsyncBackend(backend=backend, backend_options=backend_options or {})
-        if _is_asgi3(app):
-            asgi_app = app
-        else:
-            app = cast(ASGI2App, app)
-            asgi_app = _WrapASGI2(app)
-        self.app = asgi_app
+        self.app: ASGI3App = app
         self.app_state: dict[str, Any] = {}
         transport = _TestClientTransport(
             self.app,
@@ -387,40 +346,6 @@ class TestClient(httpx2.Client):
             with anyio.from_thread.start_blocking_portal(**self.async_backend) as portal:
                 yield portal
 
-    def request(
-        self,
-        method: str,
-        url: httpx2._types.URLTypes,
-        *,
-        content: httpx2._types.RequestContent | None = None,
-        data: _RequestData | None = None,
-        files: httpx2._types.RequestFiles | None = None,
-        json: Any = None,
-        params: httpx2._types.QueryParamTypes | None = None,
-        headers: httpx2._types.HeaderTypes | None = None,
-        cookies: httpx2._types.CookieTypes | None = None,
-        auth: httpx2._types.AuthTypes | httpx2._client.UseClientDefault = httpx2._client.USE_CLIENT_DEFAULT,
-        follow_redirects: bool | httpx2._client.UseClientDefault = httpx2._client.USE_CLIENT_DEFAULT,
-        timeout: httpx2._types.TimeoutTypes | httpx2._client.UseClientDefault = httpx2._client.USE_CLIENT_DEFAULT,
-        extensions: dict[str, Any] | None = None,
-    ) -> httpx2.Response:
-        url = self._merge_url(url)
-        return super().request(
-            method,
-            url,
-            content=content,
-            data=data,
-            files=files,
-            json=json,
-            params=params,
-            headers=headers,
-            cookies=cookies,
-            auth=auth,
-            follow_redirects=follow_redirects,
-            timeout=timeout,
-            extensions=extensions,
-        )
-
     def websocket_connect(
         self,
         url: str,
@@ -438,11 +363,8 @@ class TestClient(httpx2.Client):
         try:
             super().request("GET", url, **kwargs)
         except _Upgrade as exc:
-            session = exc.session
-        else:
-            raise RuntimeError("Expected WebSocket upgrade")
-
-        return session
+            return exc.session
+        raise RuntimeError("Expected WebSocket upgrade")
 
     def __enter__(self) -> Self:
         with contextlib.ExitStack() as stack:
@@ -482,32 +404,26 @@ class TestClient(httpx2.Client):
     async def wait_startup(self) -> None:
         await self.stream_receive.send({"type": "lifespan.startup"})
 
-        async def receive() -> Any:
-            message = await self.stream_send.receive()
-            if message is None:
-                self.task.result()
-            return message
-
-        message = await receive()
+        message = await self._receive_lifespan_message()
         assert message["type"] in (
             "lifespan.startup.complete",
             "lifespan.startup.failed",
         )
         if message["type"] == "lifespan.startup.failed":
-            await receive()
+            await self._receive_lifespan_message()
 
     async def wait_shutdown(self) -> None:
-        async def receive() -> Any:
-            message = await self.stream_send.receive()
-            if message is None:
-                self.task.result()
-            return message
-
         await self.stream_receive.send({"type": "lifespan.shutdown"})
-        message = await receive()
+        message = await self._receive_lifespan_message()
         assert message["type"] in (
             "lifespan.shutdown.complete",
             "lifespan.shutdown.failed",
         )
         if message["type"] == "lifespan.shutdown.failed":
-            await receive()
+            await self._receive_lifespan_message()
+
+    async def _receive_lifespan_message(self) -> Message:
+        message = await self.stream_send.receive()
+        if message is None:
+            self.task.result()
+        return cast(Message, message)
