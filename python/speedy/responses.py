@@ -22,6 +22,7 @@ from speedy._speedy import Response as _Response
 from speedy.concurrency import create_collapsing_task_group, iterate_in_threadpool
 from speedy.datastructures import URL, Headers, MutableHeaders
 from speedy.exceptions import ClientDisconnect
+from speedy.status import HTTP_400_BAD_REQUEST, HTTP_416_RANGE_NOT_SATISFIABLE
 from speedy.types import AsyncContentStream, ContentStream, Message, Receive, Scope, Send
 
 __all__ = [
@@ -261,9 +262,12 @@ class FileResponse(Response):
             try:
                 ranges = parse_range_header(http_range, stat_result.st_size, self.max_ranges)
             except MalformedRangeHeader as exc:
-                return await PlainTextResponse(exc.content, status_code=400)(scope, receive, send)
+                return await PlainTextResponse(exc.content, status_code=HTTP_400_BAD_REQUEST)(scope, receive, send)
             except RangeNotSatisfiable as exc:
-                response = PlainTextResponse(status_code=416, headers={"content-range": f"bytes */{exc.max_size}"})
+                response = PlainTextResponse(
+                    status_code=HTTP_416_RANGE_NOT_SATISFIABLE,
+                    headers={"content-range": f"bytes */{exc.max_size}"},
+                )
                 return await response(scope, receive, send)
 
             match len(ranges):
