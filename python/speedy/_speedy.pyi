@@ -6,6 +6,10 @@ from typing import Any, Literal, NamedTuple, Self
 from speedy.background import BackgroundTask
 from speedy.types import HTTPScope, RawHeaders, Receive, Send, WebSocketScope
 
+def html_escape(s: str) -> str:
+    """Escape &, <, >, ", ' for HTML, matching html.escape(s, quote=True)."""
+    ...
+
 # datastructures.rs
 class ImmutableState(Mapping[str, Any]):
     """An object meant to store arbitrary state."""

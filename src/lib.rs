@@ -4,6 +4,23 @@ mod requests;
 mod responses;
 
 use pyo3::prelude::*;
+use pyo3::types::PyString;
+
+#[pyfunction]
+pub fn html_escape(py: Python<'_>, s: &str) -> Py<PyAny> {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        match ch {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#x27;"),
+            _ => out.push(ch),
+        }
+    }
+    PyString::new(py, &out).into_any().unbind()
+}
 
 #[pymodule]
 mod _speedy {
@@ -16,6 +33,8 @@ mod _speedy {
         Address, Headers, ImmutableMultiDict, ImmutableState, MultiDict, MutableHeaders, QueryParams, State, URL,
         URLPath, UploadFile,
     };
+    #[pymodule_export]
+    use crate::html_escape;
     #[pymodule_export]
     use crate::requests::{HTTPConnection, Request, parse_json, parse_urlencoded_form};
     #[pymodule_export]
