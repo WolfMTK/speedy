@@ -3,7 +3,6 @@ from collections.abc import AsyncIterator, Iterable
 from typing import Any, Self
 
 from speedy._speedy import HTTPConnection, dump_json, parse_json
-
 from speedy.exceptions import WebSocketDisconnect, WebSocketDisconnected
 from speedy.responses import Response
 from speedy.status import WS_1000_NORMAL_CLOSURE, WS_1006_ABNORMAL_CLOSURE
@@ -92,9 +91,9 @@ class WebSocket(HTTPConnection):
             raise WebSocketDisconnected('Cannot call "send" once a close message has been sent.')
 
     async def accept(
-            self,
-            subprotocol: str | None = None,
-            headers: Iterable[tuple[bytes, bytes]] | None = None,
+        self,
+        subprotocol: str | None = None,
+        headers: Iterable[tuple[bytes, bytes]] | None = None,
     ) -> None:
         """Accept the connection, waiting for the connect message first if needed."""
         if self.client_state == WebSocketState.CONNECTING:
