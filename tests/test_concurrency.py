@@ -143,7 +143,7 @@ async def test_non_stop_iteration_error_propagates() -> None:
 
 
 @pytest.mark.anyio
-async def test_runs_in_a_different_thread() -> None:
+async def test_iterate_runs_in_a_different_thread() -> None:
     caller_thread = threading.get_ident()
 
     def gen() -> Iterator[int]:
