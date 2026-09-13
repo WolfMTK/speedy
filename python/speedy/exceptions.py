@@ -57,3 +57,11 @@ class HTTPException(ApplicationException):
     def __repr__(self) -> str:
         class_name = self.__class__.__name__
         return f"{class_name}(status_code={self.status_code!r}, detail={self.detail!r})"
+
+
+class WebSocketException(ApplicationException):
+    """Raised by application code to reject or close a WebSocket connection."""
+
+    def __init__(self, code: int, reason: str | None = None) -> None:
+        self.code = code
+        self.reason = reason or ""
