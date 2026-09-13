@@ -4,7 +4,7 @@ from typing import Any, ClassVar
 
 
 class Convertor[T]:
-    regex = ClassVar[str] = ""
+    regex: ClassVar[str] = ""
 
     def convert(self, value: str) -> T:
         raise NotImplementedError
