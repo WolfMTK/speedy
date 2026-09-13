@@ -140,6 +140,7 @@ pub struct Response {
 #[pymethods]
 impl Response {
     #[new]
+    #[pyo3(signature = (content=None, status_code=200, headers=None, media_type=None, background=None))]
     fn new(
         py: Python<'_>,
         content: Option<&Bound<'_, PyAny>>,
