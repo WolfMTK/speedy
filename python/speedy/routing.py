@@ -254,7 +254,7 @@ class Route(BaseRoute):
         path, remaining_params = replace_params(self.path_format, self.param_convertors, path_params)
         if remaining_params:
             raise NoMatchFound(name, path_params)
-        return URLPath(path, base=_URLPATH_BASE)
+        return URLPath(path, base=_URLPATH_BASE, protocol="http")
 
     async def handle(self, scope: Scope, receive: Receive, send: Send) -> None:
         if self.methods and scope["method"] not in self.methods:  # type: ignore[typeddict-item]
@@ -321,7 +321,7 @@ class WebSocketRoute(BaseRoute):
         path, remaining_params = replace_params(self.path_format, self.param_convertors, path_params)
         if remaining_params:
             raise NoMatchFound(name, path_params)
-        return URLPath(path, base=_URLPATH_BASE)
+        return URLPath(path, base=_URLPATH_BASE, protocol="websocket")
 
     async def handle(self, scope: Scope, receive: Receive, send: Send) -> None:
         await self.app(scope, receive, send)
@@ -402,7 +402,7 @@ class Mount(BaseRoute):
             for route in self.routes or []:
                 try:
                     url = route.url_path_for(remaining_name, **remaining_params)
-                    return URLPath(path_prefix.rstrip("/") + str(url.path), base=_URLPATH_BASE)
+                    return URLPath(path_prefix.rstrip("/") + str(url.path), base=_URLPATH_BASE, protocol=url.protocol)
                 except NoMatchFound:
                     pass
         raise NoMatchFound(name, path_params)
@@ -453,16 +453,16 @@ class Host(BaseRoute):
     def url_path_for(self, name: str, /, **path_params: Any) -> URLPath:
         if self.name is not None and name == self.name and "path" in path_params:
             path = path_params.pop("path")
-            _host, remaining_params = replace_params(self.host_format, self.param_convertors, path_params)
+            host, remaining_params = replace_params(self.host_format, self.param_convertors, path_params)
             if not remaining_params:
-                return URLPath(path, base=_URLPATH_BASE)
+                return URLPath(path, base=_URLPATH_BASE, host=host)
         elif self.name is None or name.startswith(self.name + ":"):
             remaining_name = name if self.name is None else name[len(self.name) + 1 :]
-            _host, remaining_params = replace_params(self.host_format, self.param_convertors, path_params)
+            host, remaining_params = replace_params(self.host_format, self.param_convertors, path_params)
             for route in self.routes or []:
                 try:
                     url = route.url_path_for(remaining_name, **remaining_params)
-                    return URLPath(str(url.path), base=_URLPATH_BASE)
+                    return URLPath(str(url.path), base=_URLPATH_BASE, protocol=url.protocol, host=host)
                 except NoMatchFound:
                     pass
         raise NoMatchFound(name, path_params)

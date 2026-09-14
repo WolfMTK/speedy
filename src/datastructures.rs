@@ -807,6 +807,10 @@ pub struct URLPath {
     path: Py<PyAny>,
     #[pyo3(get, set)]
     base: Py<PyAny>,
+    #[pyo3(get, set)]
+    protocol: String,
+    #[pyo3(get, set)]
+    host: String,
 }
 
 impl URLPath {
@@ -818,12 +822,27 @@ impl URLPath {
         Ok(split_url(&raw))
     }
 
+    fn resolve_scheme(protocol: &str, base_scheme: &str) -> String {
+        let secure = matches!(base_scheme, "https" | "wss");
+        match protocol {
+            "http" => if secure { "https" } else { "http" }.to_string(),
+            "websocket" => if secure { "wss" } else { "ws" }.to_string(),
+            _ => base_scheme.to_string(),
+        }
+    }
+
     fn build_absolute_url(&self, py: Python<'_>, base: &Bound<'_, PyAny>) -> PyResult<URL> {
         let url = Self::resolve_base(base)?;
+        let scheme = Self::resolve_scheme(&self.protocol, &url.scheme);
+        let netloc = if self.host.is_empty() {
+            url.netloc.clone()
+        } else {
+            self.host.clone()
+        };
         let trimmed_base_path = url.path.trim_end_matches('/');
         let path_str: String = self.path.bind(py).str()?.extract()?;
         let combined_path = format!("{trimmed_base_path}{path_str}");
-        let full = unsplit_url(&url.scheme, &url.netloc, &combined_path, "", "");
+        let full = unsplit_url(&scheme, &netloc, &combined_path, "", "");
         Ok(split_url(&full))
     }
 }
@@ -831,8 +850,17 @@ impl URLPath {
 #[pymethods]
 impl URLPath {
     #[new]
-    fn new(path: Py<PyAny>, base: Py<PyAny>) -> Self {
-        URLPath { path, base }
+    #[pyo3(signature = (path, base, protocol=String::new(), host=String::new()))]
+    fn new(path: Py<PyAny>, base: Py<PyAny>, protocol: String, host: String) -> PyResult<Self> {
+        if !matches!(protocol.as_str(), "" | "http" | "websocket") {
+            return Err(PyValueError::new_err(format!("Invalid protocol {protocol:?}")));
+        }
+        Ok(URLPath {
+            path,
+            base,
+            protocol,
+            host,
+        })
     }
 
     fn __str__(&self, py: Python<'_>) -> PyResult<String> {
@@ -843,6 +871,23 @@ impl URLPath {
         let path_repr = self.path.bind(py).repr()?;
         let base_repr = self.base.bind(py).repr()?;
         Ok(format!("URLPath(path={path_repr}, base={base_repr})"))
+    }
+
+    fn __eq__(&self, py: Python<'_>, other: &Bound<'_, PyAny>) -> PyResult<bool> {
+        let self_path: String = self.path.bind(py).str()?.extract()?;
+        if let Ok(other_path) = other.extract::<PyRef<'_, URLPath>>() {
+            let other_path_str: String = other_path.path.bind(py).str()?.extract()?;
+            return Ok(self_path == other_path_str);
+        }
+        if let Ok(other_str) = other.extract::<String>() {
+            return Ok(self_path == other_str);
+        }
+        Ok(false)
+    }
+
+    fn __hash__(&self, py: Python<'_>) -> PyResult<isize> {
+        let self_path: String = self.path.bind(py).str()?.extract()?;
+        self_path.into_pyobject(py)?.hash()
     }
 
     #[pyo3(signature = (base_url=None))]
