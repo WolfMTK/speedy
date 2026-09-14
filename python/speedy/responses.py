@@ -1,4 +1,5 @@
 import os
+import stat
 from collections.abc import AsyncIterable, Awaitable
 from email.utils import formatdate
 from mimetypes import guess_type
@@ -247,7 +248,7 @@ class FileResponse(Response):
                 self.set_stat_headers(stat_result)
             except FileNotFoundError as exc:
                 raise RuntimeError(f"File at path {self.path} does not exist.") from exc
-            if not os.stat.S_ISREG(stat_result.st_mode):
+            if not stat.S_ISREG(stat_result.st_mode):
                 raise RuntimeError(f"File at path {self.path} is not a file.")
         else:
             stat_result = self.stat_result
