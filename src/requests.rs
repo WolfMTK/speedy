@@ -257,7 +257,7 @@ impl HTTPConnection {
                 scope.set_item("state", PyDict::new(py))?;
             }
             let state_dict = scope.get_item("state")?.expect("just set above if missing");
-            let state_obj = py.get_type::<State>().call1((state_dict,))?;
+            let state_obj = py.get_type::<State>().call1((state_dict, false))?;
             self.cached_state = Some(state_obj.extract()?);
         }
         Ok(self.cached_state.as_ref().expect("just populated above").clone_ref(py))
