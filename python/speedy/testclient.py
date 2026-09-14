@@ -5,7 +5,6 @@ import math
 from collections.abc import Awaitable, Callable, Generator, Iterable, Mapping, Sequence
 from concurrent.futures import Future
 from contextlib import AbstractContextManager
-from types import GeneratorType
 from typing import Any, Literal, Self, TypedDict, cast
 from urllib.parse import unquote, urljoin
 
@@ -87,21 +86,6 @@ class WebSocketTestSession:
 
             await anyio.sleep_forever()
 
-    def _raise_on_close(self, message: Message) -> None:
-        if message["type"] == "websocket.close":
-            raise WebSocketDisconnect(code=message.get("code", 1000), reason=message.get("reason", ""))
-        elif message["type"] == "websocket.http.response.start":
-            status_code: int = message["status"]
-            headers: list[tuple[bytes, bytes]] = message["headers"]
-            body: list[bytes] = []
-            while True:
-                message = self.receive()
-                assert message["type"] == "websocket.http.response.body"
-                body.append(message["body"])
-                if not message.get("more_body", False):
-                    break
-            raise WebSocketDenialResponse(status_code=status_code, headers=headers, content=b"".join(body))
-
     def send(self, message: Message) -> None:
         self.portal.call(self._receive_tx.send, message)
 
@@ -139,6 +123,22 @@ class WebSocketTestSession:
         self._raise_on_close(message)
         text = message["text"] if mode == "text" else message["bytes"].decode("utf-8")
         return json.loads(text)
+
+    def _raise_on_close(self, message: Message) -> None:
+        if message["type"] == "websocket.close":
+            raise WebSocketDisconnect(code=message.get("code", 1000), reason=message.get("reason", ""))
+        elif message["type"] == "websocket.http.response.start":
+            status_code: int = message["status"]
+            headers: list[tuple[bytes, bytes]] = message["headers"]
+            body: list[bytes] = []
+            while True:
+                message = self.receive()
+                if message["type"] != "websocket.http.response.body":
+                    raise RuntimeError(f'Expected "websocket.http.response.body", got: {message["type"]!r}')
+                body.append(message["body"])
+                if not message.get("more_body", False):
+                    break
+            raise WebSocketDenialResponse(status_code=status_code, headers=headers, content=b"".join(body))
 
 
 class _TestClientTransport(httpx2.BaseTransport):
@@ -228,23 +228,7 @@ class _TestClientTransport(httpx2.BaseTransport):
                     await response_complete.wait()
                 return {"type": "http.disconnect"}
 
-            body = request.read()
-            if isinstance(body, str):
-                body_bytes: bytes = body.encode("utf-8")
-            elif body is None:
-                body_bytes = b""
-            elif isinstance(body, GeneratorType):
-                try:
-                    chunk = body.send(None)
-                    if isinstance(chunk, str):
-                        chunk = chunk.encode("utf-8")
-                    return {"type": "http.request", "body": chunk, "more_body": True}
-                except StopIteration:
-                    request_complete = True
-                    return {"type": "http.request", "body": b""}
-            else:
-                body_bytes = body
-
+            body_bytes = request.read()
             request_complete = True
             return {"type": "http.request", "body": body_bytes}
 
@@ -252,13 +236,16 @@ class _TestClientTransport(httpx2.BaseTransport):
             nonlocal raw_kwargs, response_started, debug_info
 
             if message["type"] == "http.response.start":
-                assert not response_started, 'Received multiple "http.response.start" messages.'
+                if response_started:
+                    raise RuntimeError('Received multiple "http.response.start" messages.')
                 raw_kwargs["status_code"] = message["status"]
                 raw_kwargs["headers"] = [(key.decode(), value.decode()) for key, value in message.get("headers", [])]
                 response_started = True
             elif message["type"] == "http.response.body":
-                assert response_started, 'Received "http.response.body" without "http.response.start".'
-                assert not response_complete.is_set(), 'Received "http.response.body" after response completed.'
+                if not response_started:
+                    raise RuntimeError('Received "http.response.body" without "http.response.start".')
+                if response_complete.is_set():
+                    raise RuntimeError('Received "http.response.body" after response completed.')
                 body = message.get("body", b"")
                 more_body = message.get("more_body", False)
                 if request.method != "HEAD":
@@ -277,8 +264,8 @@ class _TestClientTransport(httpx2.BaseTransport):
             if self.raise_server_exceptions:
                 raise
 
-        if self.raise_server_exceptions:
-            assert response_started, "TestClient did not receive any response."
+        if self.raise_server_exceptions and not response_started:
+            raise RuntimeError("TestClient did not receive any response.")
         elif not response_started:
             raw_kwargs = {
                 "status_code": 500,
@@ -405,20 +392,16 @@ class TestClient(httpx2.Client):
         await self.stream_receive.send({"type": "lifespan.startup"})
 
         message = await self._receive_lifespan_message()
-        assert message["type"] in (
-            "lifespan.startup.complete",
-            "lifespan.startup.failed",
-        )
+        if message["type"] not in ("lifespan.startup.complete", "lifespan.startup.failed"):
+            raise RuntimeError(f"Unexpected message during lifespan startup: {message['type']!r}")
         if message["type"] == "lifespan.startup.failed":
             await self._receive_lifespan_message()
 
     async def wait_shutdown(self) -> None:
         await self.stream_receive.send({"type": "lifespan.shutdown"})
         message = await self._receive_lifespan_message()
-        assert message["type"] in (
-            "lifespan.shutdown.complete",
-            "lifespan.shutdown.failed",
-        )
+        if message["type"] not in ("lifespan.shutdown.complete", "lifespan.shutdown.failed"):
+            raise RuntimeError(f"Unexpected message during lifespan shutdown: {message['type']!r}")
         if message["type"] == "lifespan.shutdown.failed":
             await self._receive_lifespan_message()
 
