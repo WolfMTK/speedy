@@ -395,7 +395,7 @@ class TestWebSocketDenialResponse:
             message = await websocket.receive()
             assert message == {"type": "websocket.connect"}
 
-            async def content() -> AsyncGenerator[bytes]:
+            async def content() -> AsyncGenerator[bytes, None]:
                 yield b"hello"
                 yield b"world"
 
