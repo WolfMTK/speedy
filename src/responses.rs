@@ -1,14 +1,19 @@
 // TODO: if the implementation doesn't work, move if to the Python side
 use std::str::FromStr;
 
-use cookie::{Cookie, SameSite};
+use cookie::Cookie;
 use pyo3::create_exception;
 use pyo3::exceptions::{PyAssertionError, PyException, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyBytes, PyDict, PyFloat, PyInt, PyList, PyMemoryView, PyString, PyTuple};
-use time::OffsetDateTime;
+use pyo3::types::{PyBool, PyBytes, PyDateTime, PyDict, PyFloat, PyInt, PyList, PyMemoryView, PyString, PyTuple};
+use time::{OffsetDateTime, UtcOffset};
 
 use crate::datastructures::{Headers, MutableHeaders, encode_latin1, get_raw_from_inputs, raw_to_pylist};
+
+const WEEKDAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
 
 create_exception!(speedy._speedy, MalformedRangeHeader, PyException, "A malformed Range header.");
 create_exception!(
@@ -28,6 +33,46 @@ fn render(py: Python<'_>, content: Option<&Bound<'_, PyAny>>, charset: &str) -> 
 
 fn is_bytes_like(content: &Bound<'_, PyAny>) -> bool {
     content.is_instance_of::<PyBytes>() || content.is_instance_of::<PyMemoryView>()
+}
+
+fn format_http_date(dt: OffsetDateTime) -> String {
+    let dt = dt.to_offset(UtcOffset::UTC);
+    format!(
+        "{}, {:02} {} {:04} {:02}:{:02}:{:02} GMT",
+        WEEKDAYS[dt.weekday().number_days_from_monday() as usize],
+        dt.day(),
+        MONTHS[dt.month() as usize - 1],
+        dt.year(),
+        dt.hour(),
+        dt.minute(),
+        dt.second(),
+    )
+}
+
+fn resolve_expires(py: Python<'_>, expires: &Bound<'_, PyAny>) -> PyResult<String> {
+    if let Ok(value) = expires.cast::<PyString>() {
+        return value.extract();
+    }
+    if expires.is_instance_of::<PyDateTime>() {
+        return Ok(format_http_date(expires.extract::<OffsetDateTime>()?));
+    }
+    if let Ok(seconds) = expires.extract::<i64>() {
+        let now: f64 = py.import("time")?.call_method0("time")?.extract()?;
+        let timestamp = (now + seconds as f64).floor() as i64;
+        let dt = OffsetDateTime::from_unix_timestamp(timestamp)
+            .map_err(|e| PyValueError::new_err(format!("invalid `expires` value: {e}")))?;
+        return Ok(format_http_date(dt));
+    }
+    Err(PyTypeError::new_err(
+        "`expires` must be a datetime.datetime, a str or an int (seconds from now)",
+    ))
+}
+
+fn validate_samesite(value: &str) -> PyResult<()> {
+    match value.to_lowercase().as_str() {
+        "strict" | "lax" | "none" => Ok(()),
+        _ => Err(PyAssertionError::new_err("samesite must be either 'strict', 'lax' or 'none'")),
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -71,54 +116,60 @@ fn make_headers_obj(py: Python<'_>, raw: Vec<(Vec<u8>, Vec<u8>)>) -> PyResult<Py
     Py::new(py, initializer)
 }
 
-fn parse_samesite(value: &str) -> PyResult<SameSite> {
-    match value.to_lowercase().as_str() {
-        "strict" => Ok(SameSite::Strict),
-        "lax" => Ok(SameSite::Lax),
-        "none" => Ok(SameSite::None),
-        _ => Err(PyAssertionError::new_err("samesite must be either 'strict', 'lax' or 'none'")),
-    }
-}
-
-fn extract_expires(expires: &Bound<'_, PyAny>) -> PyResult<OffsetDateTime> {
-    if let Ok(dt) = expires.extract::<OffsetDateTime>() {
-        return Ok(dt);
-    }
-    if let Ok(timestamp) = expires.extract::<i64>() {
-        return OffsetDateTime::from_unix_timestamp(timestamp)
-            .map_err(|e| PyValueError::new_err(format!("invalid `expires` timestamp: {e}")));
-    }
-    Err(PyTypeError::new_err(
-        "`expires` must be a datetime.datetime or an int (Unix timestamp in seconds)",
-    ))
-}
-
-fn apply_common_cookie_attrs(
-    mut builder: cookie::CookieBuilder,
+struct CookieAttrs {
+    max_age: Option<i64>,
+    expires: Option<String>,
+    path: Option<String>,
     domain: Option<String>,
+    secure: bool,
+    httponly: bool,
     samesite: Option<String>,
     partitioned: bool,
-) -> PyResult<cookie::CookieBuilder> {
-    if let Some(domain) = domain {
-        builder = builder.domain(domain);
-    }
-    if let Some(samesite) = samesite {
-        builder = builder.same_site(parse_samesite(&samesite)?);
-    }
-    if partitioned {
-        builder = builder.partitioned(true);
-    }
-    Ok(builder)
 }
 
-fn push_cookie_header(
-    headers_obj: &Py<MutableHeaders>,
-    py: Python<'_>,
-    builder: cookie::CookieBuilder<'_>,
-) -> PyResult<()> {
-    let cookie_val = builder.build().encoded().to_string();
+fn serialize_cookie(py: Python<'_>, key: String, value: String, attrs: CookieAttrs) -> PyResult<String> {
+    if let Some(samesite) = &attrs.samesite {
+        validate_samesite(samesite)?;
+    }
+    if attrs.partitioned && py.version_info() < (3, 14) {
+        return Err(PyValueError::new_err(
+            "Partitioned cookies are only supported in Python 3.14 and above.",
+        ));
+    }
+
+    let mut out = Cookie::new(key, value).encoded().to_string();
+    let non_empty = |v: Option<String>| v.filter(|v| !v.is_empty());
+
+    if let Some(domain) = non_empty(attrs.domain) {
+        out.push_str(&format!("; Domain={domain}"));
+    }
+    if let Some(expires) = non_empty(attrs.expires) {
+        out.push_str(&format!("; expires={expires}"));
+    }
+    if attrs.httponly {
+        out.push_str("; HttpOnly");
+    }
+    if let Some(max_age) = attrs.max_age {
+        out.push_str(&format!("; Max-Age={max_age}"));
+    }
+    if attrs.partitioned {
+        out.push_str("; Partitioned");
+    }
+    if let Some(path) = non_empty(attrs.path) {
+        out.push_str(&format!("; Path={path}"));
+    }
+    if let Some(samesite) = non_empty(attrs.samesite) {
+        out.push_str(&format!("; SameSite={samesite}"));
+    }
+    if attrs.secure {
+        out.push_str("; Secure");
+    }
+    Ok(out)
+}
+
+fn push_cookie_header(headers_obj: &Py<MutableHeaders>, py: Python<'_>, cookie_val: &str) -> PyResult<()> {
     let mut base = headers_obj.bind(py).borrow_mut().into_super();
-    base.raw.push((b"set-cookie".to_vec(), encode_latin1(&cookie_val)?));
+    base.raw.push((b"set-cookie".to_vec(), encode_latin1(cookie_val)?));
     Ok(())
 }
 
@@ -209,21 +260,26 @@ impl Response {
         samesite: Option<String>,
         partitioned: bool,
     ) -> PyResult<()> {
-        let mut builder = Cookie::build((key, value))
-            .path(path.unwrap_or_default())
-            .secure(secure)
-            .http_only(httponly);
-
-        if let Some(max_age) = max_age {
-            builder = builder.max_age(time::Duration::seconds(max_age));
-        }
-        if let Some(expires) = expires {
-            if !expires.is_none() {
-                builder = builder.expires(extract_expires(expires)?);
-            }
-        }
-        builder = apply_common_cookie_attrs(builder, domain, samesite, partitioned)?;
-        push_cookie_header(&self.headers_obj, py, builder)
+        let expires = match expires {
+            Some(expires) if !expires.is_none() => Some(resolve_expires(py, expires)?),
+            _ => None,
+        };
+        let cookie = serialize_cookie(
+            py,
+            key,
+            value,
+            CookieAttrs {
+                max_age,
+                expires,
+                path,
+                domain,
+                secure,
+                httponly,
+                samesite,
+                partitioned,
+            },
+        )?;
+        push_cookie_header(&self.headers_obj, py, &cookie)
     }
 
     #[pyo3(signature = (
@@ -247,15 +303,22 @@ impl Response {
         samesite: Option<String>,
         partitioned: bool,
     ) -> PyResult<()> {
-        let builder = Cookie::build((key, ""))
-            .path(path)
-            .secure(secure)
-            .http_only(httponly)
-            .max_age(time::Duration::seconds(0))
-            .expires(OffsetDateTime::UNIX_EPOCH);
-
-        let builder = apply_common_cookie_attrs(builder, domain, samesite, partitioned)?;
-        push_cookie_header(&self.headers_obj, py, builder)
+        let cookie = serialize_cookie(
+            py,
+            key,
+            String::new(),
+            CookieAttrs {
+                max_age: Some(0),
+                expires: Some(format_http_date(OffsetDateTime::UNIX_EPOCH)),
+                path: Some(path),
+                domain,
+                secure,
+                httponly,
+                samesite,
+                partitioned,
+            },
+        )?;
+        push_cookie_header(&self.headers_obj, py, &cookie)
     }
 }
 

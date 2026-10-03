@@ -1,6 +1,6 @@
 import os
 import stat
-from collections.abc import AsyncIterable, Awaitable
+from collections.abc import AsyncIterable, Awaitable, Mapping
 from email.utils import formatdate
 from mimetypes import guess_type
 from secrets import token_hex
@@ -35,6 +35,11 @@ __all__ = [
     "Response",
     "StreamingResponse",
 ]
+
+
+def _has_content_length(headers: Mapping[str, str] | None) -> bool:
+    """Whether the caller explicitly passed a ``content-length`` header."""
+    return headers is not None and "content-length" in Headers(headers)
 
 
 class Response(_Response):
@@ -138,7 +143,7 @@ class StreamingResponse(Response):
         media_type: str | None = None,
         background: Any = None,
     ) -> None:
-        if "content-length" in self.headers:
+        if "content-length" in self.headers and not _has_content_length(headers):
             del self.headers["content-length"]
         self.body_iterator = content if isinstance(content, AsyncIterable) else iterate_in_threadpool(content)
 
@@ -213,7 +218,7 @@ class FileResponse(Response):
         stat_result: os.stat_result | None = None,
         content_disposition_type: str = "attachment",
     ) -> None:
-        if "content-length" in self.headers:
+        if "content-length" in self.headers and not _has_content_length(headers):
             del self.headers["content-length"]
 
         self.path = path

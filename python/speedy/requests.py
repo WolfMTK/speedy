@@ -35,7 +35,7 @@ class Request(_Request):
     def __new__(cls, scope: HTTPScope, receive: Receive = empty_receive, send: Send = empty_send) -> Self:
         return super().__new__(cls, scope, receive, send)
 
-    def __init__(self, scope: HTTPScope, receive: Receive, send: Send) -> None:
+    def __init__(self, scope: HTTPScope, receive: Receive = empty_receive, send: Send = empty_send) -> None:
         self._stream_consumed = False
         self._is_disconnected = False
         self._form: FormMultiDict | None = None
