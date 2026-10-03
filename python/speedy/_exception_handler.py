@@ -70,8 +70,10 @@ def wrap_app_handling_exceptions(app: ASGIApplication, conn: Request | WebSocket
                 websocket_handler = cast(WebSocketExceptionHandler, handler)
                 websocket = cast(WebSocket, conn)
                 if is_async_callable(websocket_handler):
-                    await websocket_handler(websocket, exc)
+                    ws_response = cast("Response | None", await websocket_handler(websocket, exc))
                 else:
-                    await run_in_threadpool(websocket_handler, websocket, exc)
+                    ws_response = cast("Response | None", await run_in_threadpool(websocket_handler, websocket, exc))
+                if ws_response is not None:
+                    await ws_response(scope, receive, sender)
 
     return wrapped_app

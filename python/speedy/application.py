@@ -19,7 +19,7 @@ class Speedy:
         debug: bool = False,
         routes: Sequence[BaseRoute] | None = None,
         middleware: Sequence[Middleware] | None = None,
-        exception_handler: Mapping[Any, ExceptionHandler] | None = None,
+        exception_handlers: Mapping[Any, ExceptionHandler] | None = None,
         lifespan: Lifespan | None = None,
         *,
         max_body_size: int | None = None,
@@ -28,7 +28,7 @@ class Speedy:
         self.state = State()
         self.router = Router(routes, lifespan=lifespan)
         self.max_body_size = max_body_size
-        self.exception_handlers = {} if exception_handler is None else dict(exception_handler)
+        self.exception_handlers = {} if exception_handlers is None else dict(exception_handlers)
         self.user_middleware = [] if middleware is None else list(middleware)
         self.middleware_stack: ASGIApplication | None = None
 
