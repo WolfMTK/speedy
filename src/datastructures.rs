@@ -12,6 +12,14 @@ use url::form_urlencoded;
 
 type Key = Arc<str>;
 
+pub(crate) fn extract_host_port(value: &Bound<'_, PyAny>) -> PyResult<(String, u16)> {
+    let items = value.try_iter()?.collect::<PyResult<Vec<_>>>()?;
+    match items.as_slice() {
+        [host, port] => Ok((host.extract()?, port.extract()?)),
+        _ => Err(PyValueError::new_err("expected a (host, port) pair")),
+    }
+}
+
 fn state_exception(py: Python<'_>, message: String) -> PyErr {
     match py
         .import("speedy.exceptions")
@@ -1842,7 +1850,7 @@ pub(crate) fn url_from_scope(scope: &Bound<'_, PyDict>) -> PyResult<URL> {
             None => path.clone(),
             Some(server) if server.is_none() => path.clone(),
             Some(server) => {
-                let (host, port): (String, u16) = server.extract()?;
+                let (host, port) = extract_host_port(&server)?;
                 let default_port = DEFAULT_PORTS.iter().find(|(s, _)| *s == scheme).map(|(_, p)| *p);
                 if Some(port) == default_port {
                     format!("{scheme}://{host}{path}")

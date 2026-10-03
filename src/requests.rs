@@ -1,11 +1,12 @@
-use cookie::Cookie;
 use pyo3::exceptions::{PyAssertionError, PyKeyError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyList, PyString};
 use pyo3::{PyTypeCheck, create_exception};
 use url::form_urlencoded;
 
-use crate::datastructures::{Address, Headers, QueryParams, State, URL, get_raw_from_inputs, url_from_scope};
+use crate::datastructures::{
+    Address, Headers, QueryParams, State, URL, extract_host_port, get_raw_from_inputs, url_from_scope,
+};
 
 create_exception!(
     speedy._speedy,
@@ -196,9 +197,9 @@ impl HTTPConnection {
         let result = PyDict::new(py);
         header_values
             .iter()
-            .flat_map(|header_value| Cookie::split_parse_encoded(header_value.as_str()))
-            .filter_map(Result::ok)
-            .try_for_each(|cookie| result.set_item(cookie.name(), cookie.value()))?;
+            .map(String::as_str)
+            .flat_map(parse_cookie_header)
+            .try_for_each(|(name, value)| result.set_item(name, value))?;
 
         let cookies = result.unbind();
         self.cached_cookies = Some(cookies.clone_ref(py));
@@ -209,7 +210,7 @@ impl HTTPConnection {
     fn client(&self, py: Python<'_>) -> PyResult<Option<Address>> {
         match self.scope.bind(py).get_item("client")? {
             Some(value) if !value.is_none() => {
-                let (host, port): (String, u16) = value.extract()?;
+                let (host, port) = extract_host_port(&value)?;
                 Ok(Some(Address { host, port }))
             }
             _ => Ok(None),
@@ -453,4 +454,21 @@ pub fn parse_urlencoded_form(body: &[u8]) -> Vec<(String, String)> {
     form_urlencoded::parse(body)
         .map(|(k, v)| (k.into_owned(), v.into_owned()))
         .collect()
+}
+
+fn percent_decode(value: &str) -> String {
+    percent_encoding::percent_decode_str(value)
+        .decode_utf8()
+        .map_or_else(|_| value.to_owned(), |decoded| decoded.into_owned())
+}
+
+fn parse_cookie_header(header: &str) -> impl Iterator<Item = (String, String)> + '_ {
+    header.split(';').filter_map(|chunk| {
+        let (name, value) = chunk.split_once('=').unwrap_or(("", chunk));
+        let (name, value) = (name.trim(), value.trim());
+        if name.is_empty() && value.is_empty() {
+            return None;
+        }
+        Some((percent_decode(name), percent_decode(value)))
+    })
 }

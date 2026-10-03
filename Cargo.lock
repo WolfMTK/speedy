@@ -486,6 +486,7 @@ dependencies = [
  "cookie",
  "indexmap",
  "md5",
+ "percent-encoding",
  "pyo3",
  "regex",
  "serde_json",
