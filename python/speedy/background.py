@@ -19,7 +19,7 @@ class BackgroundTask[**P]:
 
 
 class BackgroundTasks[**P]:
-    def __init__(self, tasks: Sequence[BackgroundTask] | None) -> None:
+    def __init__(self, tasks: Sequence[BackgroundTask] | None = None) -> None:
         self.tasks = list(tasks) if tasks else []
 
     def add_task(self, func: Callable[P, Any], *args: P.args, **kwargs: P.kwargs) -> None:
