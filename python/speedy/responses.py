@@ -8,12 +8,12 @@ from typing import Any, Self
 from urllib.parse import quote
 
 import anyio
+import orjson
 
 from speedy._speedy import (
     MalformedRangeHeader,
     RangeNotSatisfiable,
     compute_etag,
-    dump_json,
     multipart_closing_boundary,
     multipart_content_length,
     multipart_range_header,
@@ -96,7 +96,7 @@ class JSONResponse(Response):
         media_type: str | None = "application/json",
         background: Any = None,
     ) -> Self:
-        body = dump_json(content)
+        body = orjson.dumps(content)
         return super().__new__(cls, body, status_code, headers, media_type, background)
 
 

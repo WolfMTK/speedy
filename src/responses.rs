@@ -1,11 +1,9 @@
 // TODO: if the implementation doesn't work, move if to the Python side
-use std::str::FromStr;
-
 use cookie::Cookie;
 use pyo3::create_exception;
 use pyo3::exceptions::{PyAssertionError, PyException, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyBytes, PyDateTime, PyDict, PyFloat, PyInt, PyList, PyMemoryView, PyString, PyTuple};
+use pyo3::types::{PyBytes, PyDateTime, PyList, PyMemoryView, PyString};
 use time::{OffsetDateTime, UtcOffset};
 
 use crate::datastructures::{Headers, MutableHeaders, encode_latin1, get_raw_from_inputs, raw_to_pylist};
@@ -320,104 +318,6 @@ impl Response {
         )?;
         push_cookie_header(&self.headers_obj, py, &cookie)
     }
-}
-
-#[pyfunction]
-pub fn dump_json(py: Python<'_>, content: &Bound<'_, PyAny>) -> PyResult<Py<PyBytes>> {
-    let value = python_to_json_value(content)?;
-    let bytes = serde_json::to_vec(&value).map_err(|e| PyValueError::new_err(e.to_string()))?;
-    Ok(PyBytes::new(py, &bytes).unbind())
-}
-
-fn python_to_json_value(obj: &Bound<'_, PyAny>) -> PyResult<serde_json::Value> {
-    if obj.is_none() {
-        return Ok(serde_json::Value::Null);
-    }
-    if let Ok(b) = obj.cast::<PyBool>() {
-        return Ok(serde_json::Value::Bool(b.is_true()));
-    }
-    if obj.is_instance_of::<PyInt>() {
-        let digits: String = obj.str()?.extract()?;
-        let number = serde_json::Number::from_str(&digits).map_err(|e| PyValueError::new_err(e.to_string()))?;
-        return Ok(serde_json::Value::Number(number));
-    }
-    if obj.is_instance_of::<PyFloat>() {
-        return Ok(serde_json::Value::Number(json_number(obj.extract()?)?));
-    }
-    if let Ok(s) = obj.cast::<PyString>() {
-        return Ok(serde_json::Value::String(s.extract()?));
-    }
-    if let Ok(list) = obj.cast::<PyList>() {
-        let items = list
-            .iter()
-            .map(|item| python_to_json_value(&item))
-            .collect::<PyResult<_>>()?;
-        return Ok(serde_json::Value::Array(items));
-    }
-    if let Ok(tuple) = obj.cast::<PyTuple>() {
-        let items = tuple
-            .iter()
-            .map(|item| python_to_json_value(&item))
-            .collect::<PyResult<_>>()?;
-        return Ok(serde_json::Value::Array(items));
-    }
-    if let Ok(dict) = obj.cast::<PyDict>() {
-        let map = dict
-            .iter()
-            .map(|(key, value)| Ok((json_key_string(&key)?, python_to_json_value(&value)?)))
-            .collect::<PyResult<serde_json::Map<String, serde_json::Value>>>()?;
-        return Ok(serde_json::Value::Object(map));
-    }
-
-    let type_name: String = obj.get_type().name()?.extract()?;
-    Err(PyTypeError::new_err(format!(
-        "Object of type {type_name} is not JSON serializable"
-    )))
-}
-
-fn json_key_string(key: &Bound<'_, PyAny>) -> PyResult<String> {
-    if let Ok(s) = key.cast::<PyString>() {
-        return s.extract();
-    }
-    if key.is_none() {
-        return Ok("null".to_string());
-    }
-    if let Ok(b) = key.cast::<PyBool>() {
-        return Ok(if b.is_true() {
-            "true".to_string()
-        } else {
-            "false".to_string()
-        });
-    }
-    if key.is_instance_of::<PyInt>() {
-        return key.str()?.extract();
-    }
-    if key.is_instance_of::<PyFloat>() {
-        let f: f64 = key.extract()?;
-        return serde_json::to_string(&json_number(f)?).map_err(|e| PyValueError::new_err(e.to_string()));
-    }
-    let type_name: String = key.get_type().name()?.extract()?;
-    Err(PyTypeError::new_err(format!(
-        "keys must be str, int, float, bool or None, not {type_name}"
-    )))
-}
-
-fn json_number(f: f64) -> PyResult<serde_json::Number> {
-    if !f.is_finite() {
-        return Err(json_out_of_range(f));
-    }
-    serde_json::Number::from_f64(f).ok_or_else(|| json_out_of_range(f))
-}
-
-fn json_out_of_range(f: f64) -> PyErr {
-    let repr = if f.is_nan() {
-        "nan"
-    } else if f.is_sign_positive() {
-        "inf"
-    } else {
-        "-inf"
-    };
-    PyValueError::new_err(format!("Out of range float values are not JSON compliant: {repr}"))
 }
 
 #[pyfunction]

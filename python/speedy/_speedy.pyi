@@ -622,18 +622,3 @@ class Request(HTTPConnection):
 
     @property
     def _send(self) -> Send: ...
-
-class JSONDecodeError(ValueError):
-    """A JSON decoding error, shaped like `json.JSONDecodeError`."""
-
-    msg: str
-    doc: str
-    pos: int
-    lineno: int
-    colno: int
-
-def parse_json(body: bytes) -> Any:
-    """Parse a JSON request body."""
-
-def parse_urlencoded_form(body: bytes) -> list[tuple[str, str]]:
-    """Parse body into flat pairs."""

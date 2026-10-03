@@ -2,8 +2,9 @@ from collections.abc import AsyncGenerator
 from typing import Any, Self
 
 import anyio
+import orjson
 
-from speedy._speedy import MultiPartFormParser, parse_content_header, parse_json, parse_urlencoded_form
+from speedy._speedy import MultiPartFormParser, parse_content_header, parse_urlencoded_form
 from speedy._speedy import Request as _Request
 from speedy.concurrency import AwaitableOrContextManagerWrapper
 from speedy.datastructures import FormMultiDict
@@ -72,7 +73,7 @@ class Request(_Request):
     async def json(self) -> Any:
         """Get the request body parsed as JSON."""
         if not hasattr(self, "_json"):
-            self._json = parse_json(await self.body())
+            self._json = orjson.loads(await self.body())
         return self._json
 
     def form(self, *, max_fields: int = 1000) -> AwaitableOrContextManagerWrapper:

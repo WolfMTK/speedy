@@ -2,7 +2,9 @@ import enum
 from collections.abc import AsyncIterator, Iterable
 from typing import Any, Self
 
-from speedy._speedy import HTTPConnection, dump_json, parse_json
+import orjson
+
+from speedy._speedy import HTTPConnection
 from speedy.exceptions import WebSocketDisconnect, WebSocketDisconnected
 from speedy.responses import Response
 from speedy.status import WS_1000_NORMAL_CLOSURE, WS_1006_ABNORMAL_CLOSURE
@@ -126,7 +128,7 @@ class WebSocket(HTTPConnection):
         self._raise_on_disconnect(message)
         receive_event = message
         raw = receive_event["bytes"] if mode == "binary" else receive_event["text"].encode("utf-8")
-        return parse_json(raw)
+        return orjson.loads(raw)
 
     async def iter_text(self) -> AsyncIterator[str]:
         """Iterate over incoming text messages until disconnect."""
@@ -164,7 +166,7 @@ class WebSocket(HTTPConnection):
         """Serialize data as JSON and send it."""
         if mode not in {"text", "binary"}:
             raise RuntimeError('The "mode" argument should be "text" or "binary".')
-        body = dump_json(data)
+        body = orjson.dumps(data)
         if mode == "text":
             await self.send({"type": "websocket.send", "text": body.decode("utf-8"), "bytes": None})
         else:
