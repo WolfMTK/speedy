@@ -1,0 +1,205 @@
+from collections.abc import Generator
+from typing import Any
+
+import pytest
+from pytest import MonkeyPatch
+
+from speedy.exceptions import HTTPException, WebSocketException
+from speedy.middleware.exceptions import ExceptionMiddleware
+from speedy.requests import Request
+from speedy.responses import JSONResponse, PlainTextResponse
+from speedy.routing import Route, Router, WebSocketRoute
+from speedy.testclient import TestClient
+from speedy.types import Receive, Scope, Send
+from tests.types import TestClientFactory
+
+
+def raise_runtime_error(request: Request) -> None:
+    raise RuntimeError("Yikes")
+
+
+def not_acceptable(request: Request) -> None:
+    raise HTTPException(status_code=406)
+
+
+def no_content(request: Request) -> None:
+    raise HTTPException(status_code=204)
+
+
+def not_modified(request: Request) -> None:
+    raise HTTPException(status_code=304)
+
+
+def with_headers(request: Request) -> None:
+    raise HTTPException(status_code=200, headers={"x-potato": "always"})
+
+
+def non_standard_status_code(request: Request) -> None:
+    raise HTTPException(status_code=499)
+
+
+class BadBodyException(HTTPException):
+    pass
+
+
+async def read_body_and_raise_exc(request: Request) -> None:
+    await request.body()
+    raise BadBodyException(422)
+
+
+async def handler_that_reads_body(request: Request, exc: BadBodyException) -> JSONResponse:
+    body = await request.body()
+    return JSONResponse(status_code=422, content={"body": body.decode()})
+
+
+class HandledExcAfterResponse:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        response = PlainTextResponse("OK", status_code=200)
+        await response(scope, receive, send)
+        raise HTTPException(status_code=406)
+
+
+router = Router(
+    routes=[
+        Route("/runtime_error", endpoint=raise_runtime_error),
+        Route("/not_acceptable", endpoint=not_acceptable),
+        Route("/no_content", endpoint=no_content),
+        Route("/not_modified", endpoint=not_modified),
+        Route("/with_headers", endpoint=with_headers),
+        Route("/non_standard_status_code", endpoint=non_standard_status_code),
+        Route("/handled_exc_after_response", endpoint=HandledExcAfterResponse()),
+        WebSocketRoute("/runtime_error", endpoint=raise_runtime_error),
+        Route("/consume_body_in_endpoint_and_handler", endpoint=read_body_and_raise_exc, methods=["POST"]),
+    ]
+)
+
+
+app = ExceptionMiddleware(
+    router,
+    handlers={BadBodyException: handler_that_reads_body},
+)
+
+
+@pytest.fixture
+def client(test_client_factory: TestClientFactory) -> Generator[TestClient, None, None]:
+    with test_client_factory(app) as client:
+        yield client
+
+
+class TestHTTPException:
+    def test_not_acceptable(self, client: TestClient) -> None:
+        response = client.get("/not_acceptable")
+        assert response.status_code == 406
+        assert response.text == "Not Acceptable"
+
+    def test_no_content(self, client: TestClient) -> None:
+        response = client.get("/no_content")
+        assert response.status_code == 204
+        assert "content-length" not in response.headers
+
+    def test_not_modified(self, client: TestClient) -> None:
+        response = client.get("/not_modified")
+        assert response.status_code == 304
+        assert response.text == ""
+
+    def test_with_headers(self, client: TestClient) -> None:
+        response = client.get("/with_headers")
+        assert response.status_code == 200
+        assert response.headers["x-potato"] == "always"
+
+    def test_non_standard_status_code(self, client: TestClient) -> None:
+        response = client.get("/non_standard_status_code")
+        assert response.status_code == 499
+        assert response.text == ""
+
+    def test_str(self) -> None:
+        assert str(HTTPException(status_code=404)) == "404: Not Found"
+        assert str(HTTPException(404, "Not Found: foo")) == "404: Not Found: foo"
+        assert str(HTTPException(404, headers={"key": "value"})) == "404: Not Found"
+
+    def test_repr(self) -> None:
+        assert repr(HTTPException(404)) == "HTTPException(status_code=404, detail='Not Found')"
+        assert repr(HTTPException(404, detail="Not Found: foo")) == (
+            "HTTPException(status_code=404, detail='Not Found: foo')"
+        )
+
+        class CustomHTTPException(HTTPException):
+            pass
+
+        assert repr(CustomHTTPException(500, detail="Something custom")) == (
+            "CustomHTTPException(status_code=500, detail='Something custom')"
+        )
+
+
+class TestWebSocketException:
+    def test_str(self) -> None:
+        assert str(WebSocketException(1008)) == "1008: "
+        assert str(WebSocketException(1008, "Policy Violation")) == "1008: Policy Violation"
+
+    def test_repr(self) -> None:
+        assert repr(WebSocketException(1008, reason="Policy Violation")) == (
+            "WebSocketException(code=1008, reason='Policy Violation')"
+        )
+
+        class CustomWebSocketException(WebSocketException):
+            pass
+
+        assert repr(CustomWebSocketException(1013, reason="Something custom")) == (
+            "CustomWebSocketException(code=1013, reason='Something custom')"
+        )
+
+
+class TestExceptionMiddleware:
+    def test_websockets_should_raise(self, client: TestClient) -> None:
+        with pytest.raises(RuntimeError):
+            with client.websocket_connect("/runtime_error"):
+                pass
+
+    def test_handled_exc_after_response(self, test_client_factory: TestClientFactory, client: TestClient) -> None:
+        with pytest.raises(RuntimeError, match="Caught handled exception, but response already started."):
+            client.get("/handled_exc_after_response")
+
+        allow_200_client = test_client_factory(app, raise_server_exceptions=False)
+        response = allow_200_client.get("/handled_exc_after_response")
+        assert response.status_code == 200
+        assert response.text == "OK"
+
+    def test_force_500_response(self, test_client_factory: TestClientFactory) -> None:
+        called = False
+
+        async def app(scope: Scope, receive: Receive, send: Send) -> None:
+            nonlocal called
+            called = True
+            raise RuntimeError()
+
+        force_500_client = test_client_factory(app, raise_server_exceptions=False)
+        response = force_500_client.get("/")
+        assert called
+        assert response.status_code == 500
+        assert response.text == ""
+
+    def test_request_in_app_and_handler_is_the_same_object(self, client: TestClient) -> None:
+        response = client.post("/consume_body_in_endpoint_and_handler", content=b"Hello!")
+        assert response.status_code == 422
+        assert response.json() == {"body": "Hello!"}
+
+    def test_http_exception_does_not_use_threadpool(self, client: TestClient, monkeypatch: MonkeyPatch) -> None:
+        from speedy import _exception_handler
+
+        def mock_run_in_threadpool(*args: Any, **kwargs: Any) -> None:
+            pytest.fail("run_in_threadpool should not be called for HTTP exceptions")
+
+        monkeypatch.setattr(_exception_handler, "run_in_threadpool", mock_run_in_threadpool)
+
+        response = client.get("/not_acceptable")
+        assert response.status_code == 406
+
+    def test_handlers_annotations(self) -> None:
+        async def async_catch_all_handler(request: Request, exc: Exception) -> JSONResponse:
+            raise NotImplementedError
+
+        def sync_catch_all_handler(request: Request, exc: Exception) -> JSONResponse:
+            raise NotImplementedError
+
+        ExceptionMiddleware(router, handlers={Exception: sync_catch_all_handler})
+        ExceptionMiddleware(router, handlers={Exception: async_catch_all_handler})

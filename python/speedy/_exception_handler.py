@@ -9,14 +9,12 @@ from speedy.types import (
     ExceptionHandler,
     ExceptionHandlers,
     HTTPExceptionHandler,
-    HTTPScope,
     Message,
     Receive,
     Scope,
     Send,
     StatusHandlers,
     WebSocketExceptionHandler,
-    WebSocketScope,
 )
 from speedy.websocket import WebSocket
 
@@ -62,7 +60,7 @@ def wrap_app_handling_exceptions(app: ASGIApplication, conn: Request | WebSocket
 
             if scope["type"] == "http":
                 http_handler = cast(HTTPExceptionHandler, handler)
-                request = Request(cast(HTTPScope, scope), receive, send)
+                request = cast(Request, conn)
                 if is_async_callable(http_handler):
                     response = cast(Response, await http_handler(request, exc))
                 else:
@@ -70,7 +68,7 @@ def wrap_app_handling_exceptions(app: ASGIApplication, conn: Request | WebSocket
                 await response(scope, receive, sender)
             else:
                 websocket_handler = cast(WebSocketExceptionHandler, handler)
-                websocket = WebSocket(cast(WebSocketScope, scope), receive, send)
+                websocket = cast(WebSocket, conn)
                 if is_async_callable(websocket_handler):
                     await websocket_handler(websocket, exc)
                 else:

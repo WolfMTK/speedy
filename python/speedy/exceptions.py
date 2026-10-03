@@ -65,3 +65,10 @@ class WebSocketException(ApplicationException):
     def __init__(self, code: int, reason: str | None = None) -> None:
         self.code = code
         self.reason = reason or ""
+
+    def __str__(self) -> str:
+        return f"{self.code}: {self.reason}"
+
+    def __repr__(self) -> str:
+        class_name = type(self).__name__
+        return f"{class_name}(code={self.code!r}, reason={self.reason!r})"
