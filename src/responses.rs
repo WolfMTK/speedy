@@ -1,9 +1,9 @@
 // TODO: if the implementation doesn't work, move if to the Python side
 use cookie::Cookie;
-use pyo3::create_exception;
 use pyo3::exceptions::{PyAssertionError, PyException, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDateTime, PyList, PyMemoryView, PyString};
+use pyo3::types::{PyBytes, PyDateTime, PyList, PyMemoryView, PyString, PyType};
+use pyo3::{create_exception, intern};
 use time::{OffsetDateTime, UtcOffset};
 
 use crate::datastructures::{Headers, MutableHeaders, encode_latin1, get_raw_from_inputs, raw_to_pylist};
@@ -189,8 +189,11 @@ pub struct Response {
 #[pymethods]
 impl Response {
     #[new]
-    #[pyo3(signature = (content=None, status_code=200, headers=None, media_type=None, background=None))]
+    #[classmethod]
+    #[pyo3(signature = (content=None, status_code=200, headers=None, media_type=None, background=None)
+    )]
     fn new(
+        cls: &Bound<'_, PyType>,
         py: Python<'_>,
         content: Option<&Bound<'_, PyAny>>,
         status_code: i64,
@@ -198,6 +201,13 @@ impl Response {
         media_type: Option<String>,
         background: Option<Py<PyAny>>,
     ) -> PyResult<Self> {
+        let media_type = match media_type {
+            Some(media_type) => Some(media_type),
+            None => match cls.getattr_opt(intern!(py, "_default_media_type"))? {
+                Some(default) => default.extract::<Option<String>>()?,
+                None => None,
+            },
+        };
         let charset = "utf-8".to_string();
         let body = render(py, content, &charset)?;
         let raw_headers = build_headers(py, headers, status_code, media_type.as_deref(), &charset, body.bind(py))?;

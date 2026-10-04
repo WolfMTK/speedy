@@ -20,6 +20,28 @@ from speedy.types import (
 from speedy.websocket import WebSocket
 
 
+class ResponseTracker:
+    __slots__ = (
+        "_send",
+        "started",
+    )
+
+    def __init__(self, send: Send) -> None:
+        self._send = send
+        self.started = False
+
+    async def __call__(self, message: Message) -> None:
+        if message["type"] == "http.response.start":
+            self.started = True
+        await self._send(message)
+
+
+def track_response(send: Send) -> ResponseTracker:
+    if type(send) is ResponseTracker and not send.started:
+        return send
+    return ResponseTracker(send)
+
+
 def _lookup_exception_handler(exc_handlers: ExceptionHandlers, exc: Exception) -> ExceptionHandler | None:
     for cls in type(exc).__mro__:
         if cls in exc_handlers:
@@ -36,14 +58,7 @@ def wrap_app_handling_exceptions(
     )
 
     async def wrapped_app(scope: Scope, receive: Receive, send: Send) -> None:
-        response_started = False
-
-        async def sender(message: Message) -> None:
-            nonlocal response_started
-            if message["type"] == "http.response.start":
-                response_started = True
-            await send(message)
-
+        sender = track_response(send)
         try:
             await app(scope, receive, sender)
         except Exception as exc:
@@ -58,7 +73,7 @@ def wrap_app_handling_exceptions(
             if handler is None:
                 raise
 
-            if response_started:
+            if sender.started:
                 raise RuntimeError("Caught handled exception, but response already started.") from exc
 
             if scope["type"] == "http":

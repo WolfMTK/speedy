@@ -609,7 +609,7 @@ class HTTPConnection(Mapping[str, Any]):
 class Request(HTTPConnection):
     """An HTTP request."""
 
-    def __new__(cls, scope: HTTPScope, receive: Receive, send: Send) -> Self: ...
+    def __new__(cls, scope: HTTPScope, receive: Receive | None = None, send: Send | None = None) -> Self: ...
     @property
     def method(self) -> str:
         """Get the method."""

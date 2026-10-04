@@ -1,7 +1,7 @@
-use pyo3::PyTypeCheck;
 use pyo3::exceptions::{PyAssertionError, PyKeyError, PyRuntimeError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict};
+use pyo3::types::{PyBytes, PyDict, PyString};
+use pyo3::{PyTypeCheck, intern};
 use url::form_urlencoded;
 
 use crate::datastructures::{
@@ -23,23 +23,9 @@ pub struct HTTPConnection {
     cached_state: Option<Py<State>>,
 }
 
-#[pymethods]
 impl HTTPConnection {
-    #[new]
-    #[pyo3(signature = (scope, receive=None))]
-    fn new(py: Python<'_>, scope: Py<PyDict>, receive: Option<Py<PyAny>>) -> PyResult<Self> {
-        let scope_type: String = scope
-            .bind(py)
-            .get_item("type")?
-            .ok_or_else(|| PyKeyError::new_err("type"))?
-            .extract()?;
-        if scope_type != "http" && scope_type != "websocket" {
-            return Err(PyAssertionError::new_err(()));
-        }
-
-        let _ = receive;
-
-        Ok(Self {
+    fn from_scope(scope: Py<PyDict>) -> Self {
+        Self {
             scope,
             cached_url: None,
             cached_base_url: None,
@@ -47,7 +33,20 @@ impl HTTPConnection {
             cached_query_params: None,
             cached_cookies: None,
             cached_state: None,
-        })
+        }
+    }
+}
+
+#[pymethods]
+impl HTTPConnection {
+    #[new]
+    #[pyo3(signature = (scope, receive=None))]
+    fn new(py: Python<'_>, scope: Py<PyDict>, receive: Option<Py<PyAny>>) -> PyResult<Self> {
+        if !scope_type_in(scope.bind(py), &["http", "websocket"])? {
+            return Err(PyAssertionError::new_err(()));
+        }
+        let _ = receive;
+        Ok(Self::from_scope(scope))
     }
 
     fn __getitem__(&self, py: Python<'_>, key: String) -> PyResult<Py<PyAny>> {
@@ -298,32 +297,31 @@ pub struct Request {
 #[pymethods]
 impl Request {
     #[new]
+    #[pyo3(signature = (scope, receive=None, send=None))]
     fn new(
         py: Python<'_>,
         scope: Py<PyDict>,
-        receive: Py<PyAny>,
-        send: Py<PyAny>,
+        receive: Option<Py<PyAny>>,
+        send: Option<Py<PyAny>>,
     ) -> PyResult<PyClassInitializer<Request>> {
-        let scope_type: String = scope
-            .bind(py)
-            .get_item("type")?
-            .ok_or_else(|| PyKeyError::new_err("type"))?
-            .extract()?;
-        if scope_type != "http" {
+        if !scope_type_in(scope.bind(py), &["http"])? {
             return Err(PyAssertionError::new_err(()));
         }
-        let base = HTTPConnection::new(py, scope, None)?;
-        Ok(PyClassInitializer::from(base).add_subclass(Request { receive, send }))
+        let receive = channel_or_placeholder(py, receive, "empty_receive")?;
+        let send = channel_or_placeholder(py, send, "empty_send")?;
+        Ok(PyClassInitializer::from(HTTPConnection::from_scope(scope)).add_subclass(Request { receive, send }))
     }
 
     #[getter]
-    fn method(slf: &Bound<'_, Self>, py: Python<'_>) -> PyResult<String> {
+    fn method(slf: &Bound<'_, Self>, py: Python<'_>) -> PyResult<Py<PyString>> {
         let base = slf.borrow().into_super();
-        base.scope
+        Ok(base
+            .scope
             .bind(py)
-            .get_item("method")?
+            .get_item(intern!(py, "method"))?
             .ok_or_else(|| PyKeyError::new_err("method"))?
-            .extract()
+            .cast_into::<PyString>()?
+            .unbind())
     }
 
     #[getter]
@@ -359,4 +357,18 @@ fn parse_cookie_header(header: &str) -> impl Iterator<Item = (String, String)> +
         }
         Some((percent_decode(name), percent_decode(value)))
     })
+}
+
+fn scope_type_in(scope: &Bound<'_, PyDict>, allowed: &[&str]) -> PyResult<bool> {
+    let scope_type = scope
+        .get_item(intern!(scope.py(), "type"))?
+        .ok_or_else(|| PyKeyError::new_err("type"))?;
+    Ok(allowed.contains(&scope_type.cast::<PyString>()?.to_str()?))
+}
+
+fn channel_or_placeholder(py: Python<'_>, given: Option<Py<PyAny>>, placeholder: &str) -> PyResult<Py<PyAny>> {
+    match given {
+        Some(channel) => Ok(channel),
+        None => Ok(py.import("speedy.requests")?.getattr(placeholder)?.unbind()),
+    }
 }

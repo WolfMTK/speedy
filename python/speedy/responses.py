@@ -64,27 +64,11 @@ class Response(_Response):
 
 
 class PlainTextResponse(Response):
-    def __new__(
-        cls,
-        content: Any = None,
-        status_code: int = 200,
-        headers: Any = None,
-        media_type: str | None = "text/plain",
-        background: Any = None,
-    ) -> Self:
-        return super().__new__(cls, content, status_code, headers, media_type, background)
+    _default_media_type = "text/plain"
 
 
 class HTMLResponse(Response):
-    def __new__(
-        cls,
-        content: Any = None,
-        status_code: int = 200,
-        headers: Any = None,
-        media_type: str | None = "text/html",
-        background: Any = None,
-    ) -> Self:
-        return super().__new__(cls, content, status_code, headers, media_type, background)
+    _default_media_type = "text/html"
 
 
 class JSONResponse(Response):

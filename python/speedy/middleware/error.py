@@ -3,12 +3,13 @@ import sys
 import traceback
 from typing import cast
 
+from speedy._exception_handler import track_response
 from speedy._speedy import html_escape
 from speedy.concurrency import is_async_callable, run_in_threadpool
 from speedy.requests import Request, empty_receive, empty_send
 from speedy.responses import HTMLResponse, PlainTextResponse, Response
 from speedy.status import HTTP_500_INTERNAL_SERVER_ERROR
-from speedy.types import ASGIApplication, ExceptionHandler, HTTPScope, Message, Receive, Scope, Send
+from speedy.types import ASGIApplication, ExceptionHandler, HTTPScope, Receive, Scope, Send
 
 __all__ = ["ServerErrorMiddleware"]
 
@@ -155,17 +156,9 @@ class ServerErrorMiddleware:
             await self.app(scope, receive, send)
             return
 
-        response_started = False
-
-        async def _send(message: Message) -> None:
-            nonlocal response_started
-
-            if message["type"] == "http.response.start":
-                response_started = True
-            await send(message)
-
+        tracker = track_response(send)
         try:
-            await self.app(scope, receive, _send)
+            await self.app(scope, receive, tracker)
         except Exception as exc:
             request = Request(cast(HTTPScope, scope), empty_receive, empty_send)
             if self.debug:
@@ -177,7 +170,7 @@ class ServerErrorMiddleware:
             else:
                 response = await run_in_threadpool(self.handler, request, exc)
 
-            if not response_started:
+            if not tracker.started:
                 await response(scope, receive, send)
 
             raise exc

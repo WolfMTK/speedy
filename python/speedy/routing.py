@@ -150,7 +150,7 @@ def compile_path(path: str) -> tuple[re.Pattern[str], str, dict[str, Convertor[A
 
 class BaseRoute[ScopeT: BaseScope](ABC):
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        match, child_scope = self.matches(scope)
+        match, child_scope = self.matches(get_route_path(scope), scope)
         if match == Match.NONE:
             if scope["type"] == "http":
                 response = PlainTextResponse("Not Found", status_code=404)
@@ -164,7 +164,7 @@ class BaseRoute[ScopeT: BaseScope](ABC):
         await self.handle(scope, receive, send)
 
     @abstractmethod
-    def matches(self, scope: Scope) -> tuple[Match, dict[str, Any]]: ...
+    def matches(self, route_path: str, scope: Scope) -> tuple[Match, dict[str, Any]]: ...
 
     @abstractmethod
     def url_path_for(self, name: str, /, **path_params: Any) -> URLPath: ...
@@ -221,6 +221,7 @@ class Route(BaseRoute):
                 self.methods.add("HEAD")
 
         self.path_regex, self.path_format, self.param_convertors = compile_path(path)
+        self._literal_path: str | None = None if self.param_convertors else path
 
     def __eq__(self, other: Any) -> bool:
         return (
@@ -235,22 +236,29 @@ class Route(BaseRoute):
         methods = sorted(self.methods or [])
         return f"{class_name}(path={self.path!r}, name={self.name!r}, methods={methods!r})"
 
-    def matches(self, scope: Scope) -> tuple[Match, dict[str, Any]]:
-        path_params: dict[str, Any]
-        if scope["type"] == "http":
-            route_path = get_route_path(scope)
+    def matches(self, route_path: str, scope: Scope) -> tuple[Match, dict[str, Any]]:
+        if scope["type"] != "http":
+            return Match.NONE, {}
+
+        literal = self._literal_path
+        if literal is None:
             match = self.path_regex.match(route_path)
-            if match:
-                matched_params = match.groupdict()
-                for key, value in matched_params.items():
-                    matched_params[key] = self.param_convertors[key].convert(value)
-                path_params = dict(scope.get("path_params", {}))  # type: ignore[call-overload]
-                path_params.update(matched_params)
-                child_scope = {"endpoint": self.endpoint, "path_params": path_params}
-                if self.methods and scope["method"] not in self.methods:  # type: ignore[typeddict-item]
-                    return Match.PARTIAL, child_scope
-                return Match.FULL, child_scope
-        return Match.NONE, {}
+            if match is None:
+                return Match.NONE, {}
+            matched_params = match.groupdict()
+            for key, value in matched_params.items():
+                matched_params[key] = self.param_convertors[key].convert(value)
+            path_params = dict(scope.get("path_params", {}))  # type: ignore[call-overload]
+            path_params.update(matched_params)
+        elif route_path == literal or (route_path.endswith("\n") and self.path_regex.match(route_path)):
+            path_params = dict(scope.get("path_params", {}))  # type: ignore[call-overload]
+        else:
+            return Match.NONE, {}
+
+        child_scope = {"endpoint": self.endpoint, "path_params": path_params}
+        if self.methods and scope["method"] not in self.methods:  # type: ignore[typeddict-item]
+            return Match.PARTIAL, child_scope
+        return Match.FULL, child_scope
 
     def url_path_for(self, name: str, /, **path_params: Any) -> URLPath:
         seen_params = set(path_params.keys())
@@ -304,20 +312,20 @@ class WebSocketRoute(BaseRoute):
 
         self.path_regex, self.path_format, self.param_convertors = compile_path(path)
 
-    def matches(self, scope: Scope) -> tuple[Match, dict[str, Any]]:
-        path_params: dict[str, Any]
-        if scope["type"] == "websocket":
-            route_path = get_route_path(scope)
-            match = self.path_regex.match(route_path)
-            if match:
-                matched_params = match.groupdict()
-                for key, value in matched_params.items():
-                    matched_params[key] = self.param_convertors[key].convert(value)
-                path_params = dict(scope.get("path_params", {}))
-                path_params.update(matched_params)
-                child_scope = {"endpoint": self.endpoint, "path_params": path_params}
-                return Match.FULL, child_scope
-        return Match.NONE, {}
+    def matches(self, route_path: str, scope: Scope) -> tuple[Match, dict[str, Any]]:
+        if scope["type"] != "websocket":
+            return Match.NONE, {}
+
+        match = self.path_regex.match(route_path)
+        if match is None:
+            return Match.NONE, {}
+        matched_params = match.groupdict()
+        for key, value in matched_params.items():
+            matched_params[key] = self.param_convertors[key].convert(value)
+        path_params = dict(scope.get("path_params", {}))
+        path_params.update(matched_params)
+        child_scope = {"endpoint": self.endpoint, "path_params": path_params}
+        return Match.FULL, child_scope
 
     def url_path_for(self, name: str, /, **path_params: Any) -> URLPath:
         seen_params = set(path_params.keys())
@@ -371,28 +379,28 @@ class Mount(BaseRoute):
     def routes(self) -> list[BaseRoute]:
         return getattr(self._base_app, "routes", [])
 
-    def matches(self, scope: Scope) -> tuple[Match, dict[str, Any]]:
-        path_params: dict[str, Any]
-        if scope["type"] in {"http", "websocket"}:
-            root_path: str = scope.get("root_path", "")
-            route_path = get_route_path(scope)
-            match = self.path_regex.match(route_path)
-            if match:
-                matched_params = match.groupdict()
-                for key, value in matched_params.items():
-                    matched_params[key] = self.param_convertors[key].convert(value)
-                remaining_path = "/" + matched_params.pop("path")
-                matched_path = route_path[: -len(remaining_path)]
-                path_params = dict(scope.get("path_params", {}))  # type: ignore[call-overload]
-                path_params.update(matched_params)
-                child_scope = {
-                    "path_params": path_params,
-                    "app_root_path": scope.get("app_root_path", root_path),  # type: ignore[typeddict-item]
-                    "root_path": root_path + matched_path,
-                    "endpoint": self.app,
-                }
-                return Match.FULL, child_scope
-        return Match.NONE, {}
+    def matches(self, route_path: str, scope: Scope) -> tuple[Match, dict[str, Any]]:
+        if scope["type"] not in {"http", "websocket"}:
+            return Match.NONE, {}
+
+        match = self.path_regex.match(route_path)
+        if match is None:
+            return Match.NONE, {}
+        root_path: str = scope.get("root_path", "")
+        matched_params = match.groupdict()
+        for key, value in matched_params.items():
+            matched_params[key] = self.param_convertors[key].convert(value)
+        remaining_path = "/" + matched_params.pop("path")
+        matched_path = route_path[: -len(remaining_path)]
+        path_params = dict(scope.get("path_params", {}))  # type: ignore[call-overload]
+        path_params.update(matched_params)
+        child_scope = {
+            "path_params": path_params,
+            "app_root_path": scope.get("app_root_path", root_path),  # type: ignore[typeddict-item]
+            "root_path": root_path + matched_path,
+            "endpoint": self.app,
+        }
+        return Match.FULL, child_scope
 
     def url_path_for(self, name: str, /, **path_params: Any) -> URLPath:
         if self.name is not None and name == self.name and "path" in path_params:
@@ -440,7 +448,7 @@ class Host(BaseRoute):
     def routes(self) -> list[BaseRoute]:
         return getattr(self.app, "routes", [])
 
-    def matches(self, scope: Scope) -> tuple[Match, dict[str, Any]]:
+    def matches(self, route_path: str, scope: Scope) -> tuple[Match, dict[str, Any]]:
         if scope["type"] in {"http", "websocket"}:
             headers = Headers(scope=scope)
             parsed_host = parse_host_header(headers.get("host"))
@@ -685,7 +693,7 @@ class Router:
 
         route_path = get_route_path(scope)
         for route in self._find_routes(route_path):
-            match, child_scope = route.matches(scope)
+            match, child_scope = route.matches(route_path, scope)
             if match == Match.FULL:
                 scope["route"] = route  # type: ignore[typeddict-item]
                 scope.update(child_scope)
@@ -708,8 +716,9 @@ class Router:
             else:
                 redirect_scope["path"] = redirect_scope["path"] + "/"
 
-            for route in self._find_routes(get_route_path(redirect_scope)):
-                match, child_scope = route.matches(redirect_scope)
+            redirect_route_path = get_route_path(redirect_scope)
+            for route in self._find_routes(redirect_route_path):
+                match, child_scope = route.matches(redirect_route_path, redirect_scope)
                 if match != Match.NONE:
                     redirect_url = HTTPConnection(redirect_scope).url
                     response = RedirectResponse(url=str(redirect_url))

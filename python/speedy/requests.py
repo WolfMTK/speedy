@@ -1,5 +1,5 @@
 from collections.abc import AsyncGenerator
-from typing import Any, Self
+from typing import Any
 
 import anyio
 import orjson
@@ -9,7 +9,7 @@ from speedy._speedy import Request as _Request
 from speedy.concurrency import AwaitableOrContextManagerWrapper
 from speedy.datastructures import FormMultiDict
 from speedy.exceptions import ClientDisconnect
-from speedy.types import HTTPScope, Message, Receive, ReceiveMessage, Send
+from speedy.types import Message, ReceiveMessage
 
 __all__ = ["Request", "empty_receive", "empty_send"]
 
@@ -33,13 +33,9 @@ async def empty_send(message: Message) -> None:
 class Request(_Request):
     """An HTTP request."""
 
-    def __new__(cls, scope: HTTPScope, receive: Receive = empty_receive, send: Send = empty_send) -> Self:
-        return super().__new__(cls, scope, receive, send)
-
-    def __init__(self, scope: HTTPScope, receive: Receive = empty_receive, send: Send = empty_send) -> None:
-        self._stream_consumed = False
-        self._is_disconnected = False
-        self._form: FormMultiDict | None = None
+    _stream_consumed = False
+    _is_disconnected = False
+    _form: FormMultiDict | None = None
 
     async def stream(self) -> AsyncGenerator[bytes, None]:
         """Yield the request body in chunks as it arrives."""
