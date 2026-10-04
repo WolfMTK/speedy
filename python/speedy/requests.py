@@ -9,7 +9,7 @@ from speedy._speedy import Request as _Request
 from speedy.concurrency import AwaitableOrContextManagerWrapper
 from speedy.datastructures import FormMultiDict
 from speedy.exceptions import ClientDisconnect
-from speedy.types import Message, ReceiveMessage
+from speedy.types import HTTPScope, Message, Receive, ReceiveMessage, Send
 
 __all__ = ["Request", "empty_receive", "empty_send"]
 
@@ -36,6 +36,9 @@ class Request(_Request):
     _stream_consumed = False
     _is_disconnected = False
     _form: FormMultiDict | None = None
+
+    def __init__(self, scope: HTTPScope, receive: Receive = empty_receive, send: Send = empty_send) -> None:
+        pass
 
     async def stream(self) -> AsyncGenerator[bytes, None]:
         """Yield the request body in chunks as it arrives."""

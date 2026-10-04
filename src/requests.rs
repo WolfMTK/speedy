@@ -246,11 +246,20 @@ impl HTTPConnection {
     fn state(&mut self, py: Python<'_>) -> PyResult<Py<State>> {
         if self.cached_state.is_none() {
             let scope = self.scope.bind(py);
-            if scope.get_item("state")?.is_none() {
-                scope.set_item("state", PyDict::new(py))?;
-            }
-            let state_dict = scope.get_item("state")?.expect("just set above if missing");
-            let state_obj = py.get_type::<State>().call1((state_dict, false))?;
+            let shared_key = intern!(py, "speedy.state");
+            let state_obj = match scope.get_item(shared_key)? {
+                Some(shared) => shared,
+                None => {
+                    if scope.get_item("state")?.is_none() {
+                        scope.set_item("state", PyDict::new(py))?;
+                    }
+                    let state_dict = scope.get_item("state")?;
+                    let created = py.get_type::<State>().call1((state_dict, false))?;
+                    scope.set_item(shared_key, &created)?;
+                    created
+                }
+            };
+
             self.cached_state = Some(state_obj.extract()?);
         }
         Ok(self.cached_state.as_ref().expect("just populated above").clone_ref(py))
