@@ -8,9 +8,17 @@ from enum import Enum
 from typing import Any
 
 from speedy._exception_handler import wrap_app_handling_exceptions
-from speedy._speedy import HTTPConnection, URLPath
+from speedy._speedy import HTTPConnection, RouteTree, URLPath
 from speedy.concurrency import is_async_callable, run_in_threadpool
-from speedy.convertors import CONVERTOR_TYPES, Convertor
+from speedy.convertors import (
+    CONVERTOR_TYPES,
+    Convertor,
+    FloatConvertor,
+    IntegerConvertor,
+    PathConvertor,
+    StringConvertor,
+    UUIDConvertor,
+)
 from speedy.datastructures import Headers
 from speedy.exceptions import HTTPException
 from speedy.helpers import get_route_path, parse_host_header
@@ -479,6 +487,94 @@ class Host(BaseRoute):
         return f"{class_name}(host={self.host!r}, name={name!r}, app={self.app!r})"
 
 
+_PARAM = object()
+_TAIL = object()
+
+_SEGMENT_REGEXES = frozenset({StringConvertor.regex, IntegerConvertor.regex, FloatConvertor.regex, UUIDConvertor.regex})
+
+
+def _route_shapes(route: Any) -> list[tuple[Any, ...]] | None:
+    if type(route) is Mount:
+        path = route.path + "/{path:path}"
+    elif type(route) in (Route, WebSocketRoute):
+        path = route.path
+    else:
+        return None
+
+    shape: list[Any] = []
+    segments = path.split("/")
+    for i, segment in enumerate(segments):
+        params = [route.param_convertors[name].regex for name, _ in PARAM_REGEX.findall(segment)]
+        if not params:
+            shape.append(segment)
+        elif all(regex in _SEGMENT_REGEXES for regex in params):
+            shape.append(_PARAM)
+        elif params == [PathConvertor.regex] and PARAM_REGEX.fullmatch(segment) and i == len(segments) - 1:
+            return [(*shape, ""), (*shape, _TAIL)]
+        else:
+            return None
+    return [tuple(shape)]
+
+
+def _matchit_key(shape: tuple[Any, ...]) -> str:
+    parts = []
+    for i, segment in enumerate(shape):
+        if segment is _PARAM:
+            parts.append(f"{{p{i}}}")
+        elif segment is _TAIL:
+            parts.append(f"{{*p{i}}}")
+        else:
+            parts.append(segment.replace("{", "{{").replace("}", "}}"))
+    return "/".join(parts)
+
+
+def _shapes_overlap(a: tuple[Any, ...], b: tuple[Any, ...]) -> bool:
+    for x, y in zip(a, b, strict=False):
+        if x is _TAIL or y is _TAIL:
+            return True
+        if x is _PARAM or y is _PARAM:
+            if x == "" or y == "":
+                return False
+        elif x != y:
+            return False
+    return len(a) == len(b)
+
+
+class _RouteIndex:
+    def __init__(self, routes: Sequence[BaseRoute]) -> None:
+        self.tree = RouteTree()
+        shapes: list[tuple[Any, ...]] = []
+        key_ids: dict[str, int | None] = {}
+        route_shapes: list[list[tuple[Any, ...]] | None] = []
+
+        for route in routes:
+            owned = _route_shapes(route)
+            for shape in owned or []:
+                key = _matchit_key(shape)
+                if key not in key_ids:
+                    key_ids[key] = len(shapes) if self.tree.insert(key, len(shapes)) else None
+                    if key_ids[key] is not None:
+                        shapes.append(shape)
+                if key_ids[key] is None:
+                    owned = None
+                    break
+            route_shapes.append(owned)
+
+        self.fallback = tuple(route for route, owned in zip(routes, route_shapes, strict=True) if owned is None)
+        self.chains = [
+            tuple(
+                route
+                for route, owned in zip(routes, route_shapes, strict=True)
+                if owned is None or any(_shapes_overlap(shape, other) for other in owned)
+            )
+            for shape in shapes
+        ]
+
+    def find(self, path: str) -> tuple[BaseRoute, ...]:
+        key_id = self.tree.at(path)
+        return self.fallback if key_id is None else self.chains[key_id]
+
+
 class _DefaultLifespan:
     def __init__(self, router: "Router") -> None:
         self._router = router
@@ -505,6 +601,9 @@ class Router:
         max_body_size: int | None = None,
     ) -> None:
         self.routes = [] if routes is None else list(routes)
+        self._index: _RouteIndex | None = None
+        self._indexed_routes: list[BaseRoute] | None = None
+        self._indexed_count = 0
         self.redirect_slashes = redirect_slashes
         self.default = self.not_found if default is None else default
 
@@ -527,6 +626,14 @@ class Router:
             raise HTTPException(status_code=404)
         response = PlainTextResponse("Not Found", status_code=404)
         await response(scope, receive, send)
+
+    def _find_routes(self, route_path: str) -> tuple[BaseRoute, ...]:
+        routes = self.routes
+        if self._index is None or self._indexed_routes is not routes or self._indexed_count != len(routes):
+            self._index = _RouteIndex(routes)
+            self._indexed_routes = routes
+            self._indexed_count = len(routes)
+        return self._index.find(route_path)
 
     def url_path_for(self, name: str, /, **path_params: Any) -> URLPath:
         for route in self.routes:
@@ -576,7 +683,8 @@ class Router:
         partial = None
         partial_scope: dict[str, Any] = {}
 
-        for route in self.routes:
+        route_path = get_route_path(scope)
+        for route in self._find_routes(route_path):
             match, child_scope = route.matches(scope)
             if match == Match.FULL:
                 scope["route"] = route  # type: ignore[typeddict-item]
@@ -593,7 +701,6 @@ class Router:
             await partial.handle(scope, receive, send)
             return
 
-        route_path = get_route_path(scope)
         if scope["type"] == "http" and self.redirect_slashes and route_path != "/":
             redirect_scope: dict[str, Any] = dict(scope)
             if route_path.endswith("/"):
@@ -601,7 +708,7 @@ class Router:
             else:
                 redirect_scope["path"] = redirect_scope["path"] + "/"
 
-            for route in self.routes:
+            for route in self._find_routes(get_route_path(redirect_scope)):
                 match, child_scope = route.matches(redirect_scope)
                 if match != Match.NONE:
                     redirect_url = HTTPConnection(redirect_scope).url

@@ -622,3 +622,16 @@ class Request(HTTPConnection):
 
     @property
     def _send(self) -> Send: ...
+
+# routing.rs
+class RouteTree:
+    """A thin wrapper around the matchit radix tree which maps path keys to integer ids."""
+
+    def __init__(self) -> None: ...
+    def insert(self, key: str, value: int) -> bool:
+        """Insert a matchit key."""
+        ...
+
+    def at(self, path: str) -> int | None:
+        """Return the id of the key matching the path, or None."""
+        ...

@@ -2,6 +2,7 @@ mod _multipart;
 mod datastructures;
 mod requests;
 mod responses;
+mod routing;
 
 use pyo3::prelude::*;
 use pyo3::types::PyString;
@@ -42,6 +43,8 @@ mod _speedy {
         Response, compute_etag, multipart_closing_boundary, multipart_content_length, multipart_range_header,
         parse_range_header,
     };
+    #[pymodule_export]
+    use crate::routing::RouteTree;
 
     #[pymodule_init]
     fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
