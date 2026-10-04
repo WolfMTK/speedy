@@ -248,15 +248,15 @@ class Route(BaseRoute):
             matched_params = match.groupdict()
             for key, value in matched_params.items():
                 matched_params[key] = self.param_convertors[key].convert(value)
-            path_params = dict(scope.get("path_params", {}))  # type: ignore[call-overload]
+            path_params = dict(scope.get("path_params", {}))
             path_params.update(matched_params)
         elif route_path == literal or (route_path.endswith("\n") and self.path_regex.match(route_path)):
-            path_params = dict(scope.get("path_params", {}))  # type: ignore[call-overload]
+            path_params = dict(scope.get("path_params", {}))
         else:
             return Match.NONE, {}
 
         child_scope = {"endpoint": self.endpoint, "path_params": path_params}
-        if self.methods and scope["method"] not in self.methods:  # type: ignore[typeddict-item]
+        if self.methods and scope["method"] not in self.methods:
             return Match.PARTIAL, child_scope
         return Match.FULL, child_scope
 
@@ -273,7 +273,7 @@ class Route(BaseRoute):
         return URLPath(path, base=_URLPATH_BASE, protocol="http")
 
     async def handle(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if self.methods and scope["method"] not in self.methods:  # type: ignore[typeddict-item]
+        if self.methods and scope["method"] not in self.methods:
             headers = {"Allow": ", ".join(self.methods)}
             if "app" in scope:
                 raise HTTPException(status_code=405, headers=headers)
@@ -392,11 +392,11 @@ class Mount(BaseRoute):
             matched_params[key] = self.param_convertors[key].convert(value)
         remaining_path = "/" + matched_params.pop("path")
         matched_path = route_path[: -len(remaining_path)]
-        path_params = dict(scope.get("path_params", {}))  # type: ignore[call-overload]
+        path_params = dict(scope.get("path_params", {}))
         path_params.update(matched_params)
         child_scope = {
             "path_params": path_params,
-            "app_root_path": scope.get("app_root_path", root_path),  # type: ignore[typeddict-item]
+            "app_root_path": scope.get("app_root_path", root_path),
             "root_path": root_path + matched_path,
             "endpoint": self.app,
         }
@@ -460,7 +460,7 @@ class Host(BaseRoute):
                 matched_params = match.groupdict()
                 for key, value in matched_params.items():
                     matched_params[key] = self.param_convertors[key].convert(value)
-                path_params = dict(scope.get("path_params", {}))  # type: ignore[call-overload]
+                path_params = dict(scope.get("path_params", {}))
                 path_params.update(matched_params)
                 child_scope = {"path_params": path_params, "endpoint": self.app}
                 return Match.FULL, child_scope
@@ -536,16 +536,108 @@ def _matchit_key(shape: tuple[Any, ...]) -> str:
     return "/".join(parts)
 
 
-def _shapes_overlap(a: tuple[Any, ...], b: tuple[Any, ...]) -> bool:
-    for x, y in zip(a, b, strict=False):
-        if x is _TAIL or y is _TAIL:
-            return True
-        if x is _PARAM or y is _PARAM:
-            if x == "" or y == "":
-                return False
-        elif x != y:
-            return False
-    return len(a) == len(b)
+class _Node:
+    __slots__ = ("ends", "hi", "lo", "param", "static", "tails")
+
+    def __init__(self) -> None:
+        self.static: dict[str, _Node] | None = None
+        self.param: _Node | None = None
+        self.ends: list[int] | None = None
+        self.tails: list[int] | None = None
+        self.lo = 0
+        self.hi = 0
+
+
+class _Trie:
+    def __init__(self) -> None:
+        self.root = _Node()
+        self._flat: list[int] = []
+
+    def add(self, shape: tuple[Any, ...], route_id: int) -> None:
+        node = self.root
+        for segment in shape:
+            if segment is _TAIL:
+                if node.tails is None:
+                    node.tails = []
+                node.tails.append(route_id)
+                return
+            if segment is _PARAM:
+                if node.param is None:
+                    node.param = _Node()
+                node = node.param
+                continue
+            if node.static is None:
+                node.static = {}
+            child = node.static.get(segment)
+            if child is None:
+                child = node.static[segment] = _Node()
+            node = child
+        if node.ends is None:
+            node.ends = []
+        node.ends.append(route_id)
+
+    def freeze(self) -> None:
+        """Один обход в глубину: потомки каждого узла лежат в flat[lo:hi].
+
+        Вызывать после всех add() и до overlapping().
+        """
+        flat = self._flat
+        flat.clear()
+
+        def walk(node: _Node) -> None:
+            if node.ends:
+                flat.extend(node.ends)
+            if node.tails:
+                flat.extend(node.tails)
+            node.lo = len(flat)
+            if node.static:
+                for child in node.static.values():
+                    walk(child)
+            if node.param is not None:
+                walk(node.param)
+            node.hi = len(flat)
+
+        walk(self.root)
+
+    def overlapping(self, shape: tuple[Any, ...]) -> set[int]:
+        found: set[int] = set()
+        flat = self._flat
+        frontier = [self.root]
+        for segment in shape:
+            for node in frontier:
+                if node.tails:
+                    found.update(node.tails)
+
+            if segment is _TAIL:
+                for node in frontier:
+                    if node.hi > node.lo:
+                        found.update(flat[node.lo : node.hi])
+                return found
+
+            following: list[_Node] = []
+            for node in frontier:
+                static = node.static
+                if segment is _PARAM:
+                    if static:
+                        following.extend(child for text, child in static.items() if text != "")
+                    if node.param is not None:
+                        following.append(node.param)
+                    continue
+                if static:
+                    child = static.get(segment)
+                    if child is not None:
+                        following.append(child)
+                if segment != "" and node.param is not None:
+                    following.append(node.param)
+
+            if not following:
+                return found
+            frontier = following
+
+        for node in frontier:
+            if node.ends:
+                found.update(node.ends)
+        return found
 
 
 class _RouteIndex:
@@ -568,15 +660,27 @@ class _RouteIndex:
                     break
             route_shapes.append(owned)
 
-        self.fallback = tuple(route for route, owned in zip(routes, route_shapes, strict=True) if owned is None)
-        self.chains = [
-            tuple(
-                route
-                for route, owned in zip(routes, route_shapes, strict=True)
-                if owned is None or any(_shapes_overlap(shape, other) for other in owned)
-            )
-            for shape in shapes
-        ]
+        fallback_ids = [i for i, owned in enumerate(route_shapes) if owned is None]
+        self.fallback = tuple(routes[i] for i in fallback_ids)
+
+        trie = _Trie()
+        for i, owned in enumerate(route_shapes):
+            for shape in owned or []:
+                trie.add(shape, i)
+        trie.freeze()
+
+        cache: dict[tuple[int, ...], tuple[BaseRoute, ...]] = {}
+        chains: list[tuple[BaseRoute, ...]] = []
+        for shape in shapes:
+            found = trie.overlapping(shape)
+            if fallback_ids:
+                found.update(fallback_ids)
+            ids = tuple(sorted(found))
+            chain = cache.get(ids)
+            if chain is None:
+                chain = cache[ids] = tuple(routes[i] for i in ids)
+            chains.append(chain)
+        self.chains = chains
 
     def find(self, path: str) -> tuple[BaseRoute, ...]:
         key_id = self.tree.at(path)
@@ -624,10 +728,12 @@ class Router:
         if max_body_size is not None:
             self.middleware_stack = RequestBodyLimitMiddleware(self.middleware_stack, max_body_size=max_body_size)
 
+        self._warm_up()
+
     async def not_found(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "websocket":
             websocket_close = WebSocketClose()
-            await websocket_close(scope, receive, send)  # type: ignore[arg-type]
+            await websocket_close(scope, receive, send)
             return
 
         if "app" in scope:
@@ -660,7 +766,8 @@ class Router:
                 if maybe_state is not None:
                     if "state" not in scope:
                         raise RuntimeError('The server does not support "state" in the lifespan scope.')
-                    scope["state"].update(maybe_state)  # type: ignore[typeddict-item]
+                    scope["state"].update(maybe_state)
+                self._warm_up()
                 await send({"type": "lifespan.startup.complete"})
                 started = True
                 await receive()
@@ -682,7 +789,7 @@ class Router:
             raise ValueError(f"Unsupported scope type {scope['type']!r}")
 
         if "router" not in scope:
-            scope["router"] = self  # type: ignore[typeddict-item]
+            scope["router"] = self
 
         if scope["type"] == "lifespan":
             await self.lifespan(scope, receive, send)
@@ -695,7 +802,7 @@ class Router:
         for route in self._find_routes(route_path):
             match, child_scope = route.matches(route_path, scope)
             if match == Match.FULL:
-                scope["route"] = route  # type: ignore[typeddict-item]
+                scope["route"] = route
                 scope.update(child_scope)
                 await route.handle(scope, receive, send)
                 return
@@ -763,3 +870,24 @@ class Router:
     ) -> None:
         route = WebSocketRoute(path, endpoint=endpoint, name=name)
         self.routes.append(route)
+
+    def _warm_up(self) -> None:
+        pending: list[Router] = [self]
+        seen: set[int] = set()
+        while pending:
+            router = pending.pop()
+            if id(router) in seen:
+                continue
+            seen.add(id(router))
+            router._find_routes("")
+            for route in router.routes:
+                if isinstance(route, Mount):
+                    child: Any = route._base_app
+                elif isinstance(route, Host):
+                    child = route.app
+                else:
+                    continue
+
+                child = getattr(child, "router", child)
+                if isinstance(child, Router):
+                    pending.append(child)
