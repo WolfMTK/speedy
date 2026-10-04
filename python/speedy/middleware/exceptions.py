@@ -47,13 +47,12 @@ class ExceptionMiddleware:
 
         scope["speedy.exception_handlers"] = (self._exception_handlers, self._status_handlers)
 
-        conn: Request | WebSocket
-        if scope["type"] == "http":
-            conn = Request(cast(HTTPScope, scope), receive, send)
-        else:
-            conn = WebSocket(cast(WebSocketScope, scope), receive, send)
+        def get_conn() -> Request | WebSocket:
+            if scope["type"] == "http":
+                return Request(cast(HTTPScope, scope), receive, send)
+            return WebSocket(cast(WebSocketScope, scope), receive, send)
 
-        await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+        await wrap_app_handling_exceptions(self.app, scope, get_conn)(scope, receive, send)
 
     def add_exception_handler(
         self,

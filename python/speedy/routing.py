@@ -56,7 +56,7 @@ def request_response(func: Callable[[Request], Awaitable[Response] | Response]) 
             response = await f(request)
             await response(scope, receive, send)
 
-        await wrap_app_handling_exceptions(inner_app, request)(scope, receive, send)
+        await wrap_app_handling_exceptions(inner_app, scope, lambda: request)(scope, receive, send)
 
     return app
 
@@ -68,7 +68,7 @@ def websocket_session(func: Callable[[WebSocket], Awaitable[None]]) -> ASGIAppli
         async def inner_app(scope: Scope, receive: Receive, send: Send) -> None:
             await func(session)
 
-        await wrap_app_handling_exceptions(inner_app, session)(scope, receive, send)
+        await wrap_app_handling_exceptions(inner_app, scope, lambda: session)(scope, receive, send)
 
     return app
 

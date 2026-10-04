@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import cast
 
 from speedy.concurrency import is_async_callable, run_in_threadpool
@@ -26,10 +27,12 @@ def _lookup_exception_handler(exc_handlers: ExceptionHandlers, exc: Exception) -
     return None
 
 
-def wrap_app_handling_exceptions(app: ASGIApplication, conn: Request | WebSocket) -> ASGIApplication:
+def wrap_app_handling_exceptions(
+    app: ASGIApplication, scope: Scope, get_conn: Callable[[], Request | WebSocket]
+) -> ASGIApplication:
     exception_handlers, status_handlers = cast(
         "tuple[ExceptionHandlers, StatusHandlers]",
-        conn.scope.get("speedy.exception_handlers", ({}, {})),
+        scope.get("speedy.exception_handlers", ({}, {})),
     )
 
     async def wrapped_app(scope: Scope, receive: Receive, send: Send) -> None:
@@ -60,7 +63,7 @@ def wrap_app_handling_exceptions(app: ASGIApplication, conn: Request | WebSocket
 
             if scope["type"] == "http":
                 http_handler = cast(HTTPExceptionHandler, handler)
-                request = cast(Request, conn)
+                request = cast(Request, get_conn())
                 if is_async_callable(http_handler):
                     response = cast(Response, await http_handler(request, exc))
                 else:
@@ -68,7 +71,7 @@ def wrap_app_handling_exceptions(app: ASGIApplication, conn: Request | WebSocket
                 await response(scope, receive, sender)
             else:
                 websocket_handler = cast(WebSocketExceptionHandler, handler)
-                websocket = cast(WebSocket, conn)
+                websocket = cast(WebSocket, get_conn())
                 if is_async_callable(websocket_handler):
                     ws_response = cast("Response | None", await websocket_handler(websocket, exc))
                 else:
