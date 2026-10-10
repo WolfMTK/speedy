@@ -31,7 +31,7 @@ class _ChannelClosed(Exception):
 
 
 class _Channel:
-    __slots__ = ("_buf", "_cap", "_waiter", "_closed", "_aborted")
+    __slots__ = ("_aborted", "_buf", "_cap", "_closed", "_waiter")
 
     def __init__(self, capacity: int = 1) -> None:
         self._buf: deque[Message] = deque()
@@ -206,7 +206,7 @@ class BaseHTTPMiddleware[T]:
             except _ChannelClosed:
                 return
             if message["type"] == "http.response.pathsend" or (
-                    message["type"] == "http.response.body" and not message.get("more_body", False)
+                message["type"] == "http.response.body" and not message.get("more_body", False)
             ):
                 await response_done
 
@@ -298,22 +298,22 @@ class BaseHTTPMiddleware[T]:
 
 class _StreamingResponse(Response):
     def __new__(
-            cls,
-            content: AsyncContentStream,
-            status_code: int = 200,
-            headers: Mapping[str, str] | None = None,
-            media_type: str | None = None,
-            info: Mapping[str, Any] | None = None,
+        cls,
+        content: AsyncContentStream,
+        status_code: int = 200,
+        headers: Mapping[str, str] | None = None,
+        media_type: str | None = None,
+        info: Mapping[str, Any] | None = None,
     ) -> Self:
         return super().__new__(cls, b"", status_code, headers, media_type, None)
 
     def __init__(
-            self,
-            content: AsyncContentStream,
-            status_code: int = 200,
-            headers: Mapping[str, str] | None = None,
-            media_type: str | None = None,
-            info: Mapping[str, Any] | None = None,
+        self,
+        content: AsyncContentStream,
+        status_code: int = 200,
+        headers: Mapping[str, str] | None = None,
+        media_type: str | None = None,
+        info: Mapping[str, Any] | None = None,
     ) -> None:
         if "content-length" in self.headers:
             del self.headers["content-length"]
