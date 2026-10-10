@@ -1,5 +1,6 @@
 import asyncio
-from collections.abc import Mapping
+from collections import deque
+from collections.abc import AsyncIterator, Mapping
 from typing import Any, Self, cast
 
 from speedy.concurrency import create_collapsing_task_group
@@ -9,7 +10,6 @@ from speedy.responses import Response
 from speedy.types import (
     ASGIApplication,
     AsyncContentStream,
-    BodyStreamGenerator,
     DispatchFunction,
     HTTPResponseStartEvent,
     HTTPScope,
@@ -22,51 +22,161 @@ from speedy.types import (
 )
 
 
+def _disconnect() -> ReceiveMessage:
+    return {"type": "http.disconnect"}
+
+
+class _ChannelClosed(Exception):
+    pass
+
+
+class _Channel:
+    __slots__ = ("_buf", "_cap", "_waiter", "_closed", "_aborted")
+
+    def __init__(self, capacity: int = 1) -> None:
+        self._buf: deque[Message] = deque()
+        self._cap = capacity
+        self._waiter: asyncio.Future[None] | None = None
+        self._closed = False
+        self._aborted = False
+
+    def _wake(self) -> None:
+        waiter, self._waiter = self._waiter, None
+        if waiter is not None and not waiter.done():
+            waiter.set_result(None)
+
+    async def put(self, item: Message) -> None:
+        while len(self._buf) >= self._cap:
+            if self._aborted:
+                raise _ChannelClosed
+            self._waiter = asyncio.get_running_loop().create_future()
+            await self._waiter
+        if self._aborted or self._closed:
+            raise _ChannelClosed
+        self._buf.append(item)
+        self._wake()
+
+    async def get(self) -> Message:
+        while not self._buf:
+            if self._closed or self._aborted:
+                raise _ChannelClosed
+            self._waiter = asyncio.get_running_loop().create_future()
+            await self._waiter
+        item = self._buf.popleft()
+        self._wake()
+        return item
+
+    def close(self) -> None:
+        self._closed = True
+        self._wake()
+
+    def abort(self) -> None:
+        self._aborted = True
+        self._buf.clear()
+        self._wake()
+
+
+async def _get_or_none(channel: _Channel) -> Message | None:
+    try:
+        return await channel.get()
+    except _ChannelClosed:
+        return None
+
+
+async def _first_done(a: asyncio.Future[Any], b: asyncio.Future[Any]) -> None:
+    if a.done() or b.done():
+        return
+    waiter: asyncio.Future[None] = asyncio.get_running_loop().create_future()
+
+    def _on_done(_: object) -> None:
+        if not waiter.done():
+            waiter.set_result(None)
+
+    a.add_done_callback(_on_done)
+    b.add_done_callback(_on_done)
+    try:
+        await waiter
+    finally:
+        a.remove_done_callback(_on_done)
+        b.remove_done_callback(_on_done)
+
+
 class _CachedRequest(Request):
     def __new__(cls, scope: HTTPScope, receive: Receive) -> Self:
         return super().__new__(cls, scope, receive)
 
     def __init__(self, scope: HTTPScope, receive: Receive) -> None:
         super().__init__(scope, receive, empty_send)
-        self._wrapped_rcv_disconnected = False
-        self._wrapped_rcv_consumed = False
-        self._wrapped_rcv_stream = self.stream()
+        self._replay_stream = self.stream()
+        self._body_replayed = False
+        self._disconnect_sent = False
+        self._inflight: asyncio.Task[ReceiveMessage] | None = None
+        self._lock = asyncio.Lock()
 
-    async def wrapped_receive(self) -> ReceiveMessage:
-        if self._wrapped_rcv_disconnected:
-            return {"type": "http.disconnect"}
+    async def _replay(self) -> ReceiveMessage:
+        if self._disconnect_sent:
+            return _disconnect()
 
-        if self._wrapped_rcv_consumed:
+        if self._body_replayed:
             if self._is_disconnected:
-                self._wrapped_rcv_disconnected = True
-                return {"type": "http.disconnect"}
+                self._disconnect_sent = True
+                return _disconnect()
             msg = await self.receive()
             if msg["type"] != "http.disconnect":
-                raise RuntimeError(f"Unexpected message received: {msg['type']}")
-            self._wrapped_rcv_disconnected = True
+                raise RuntimeError(f"Unexpected ASGI message: {msg['type']}")
+            self._disconnect_sent = True
             return msg
 
-        if hasattr(self, "_body"):
-            self._wrapped_rcv_consumed = True
-            return {"type": "http.request", "body": self._body, "more_body": False}
-        elif self._stream_consumed:
-            self._wrapped_rcv_consumed = True
+        body = getattr(self, "_body", None)
+        if body is not None:
+            self._body_replayed = True
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        if self._stream_consumed:
+            self._body_replayed = True
             return {"type": "http.request", "body": b"", "more_body": False}
-        else:
-            try:
-                chunk = await self._wrapped_rcv_stream.__anext__()
-                self._wrapped_rcv_consumed = self._stream_consumed
-                return {
-                    "type": "http.request",
-                    "body": chunk,
-                    "more_body": not self._stream_consumed,
-                }
-            except ClientDisconnect:
-                self._wrapped_rcv_disconnected = True
-                return {"type": "http.disconnect"}
+
+        try:
+            chunk = await self._replay_stream.__anext__()
+        except StopAsyncIteration:
+            self._body_replayed = True
+            return {"type": "http.request", "body": b"", "more_body": False}
+        except ClientDisconnect:
+            self._disconnect_sent = True
+            return _disconnect()
+
+        self._body_replayed = self._stream_consumed
+        return {"type": "http.request", "body": chunk, "more_body": not self._stream_consumed}
+
+    async def receive_message(self, stop: asyncio.Future[Any] | None = None) -> ReceiveMessage:
+        async with self._lock:
+            task = self._inflight
+            if task is None:
+                task = self._inflight = asyncio.get_running_loop().create_task(self._replay())
+
+            if stop is None:
+                await asyncio.shield(task)
+            else:
+                await _first_done(task, stop)
+                if not task.done():
+                    return _disconnect()
+
+            self._inflight = None
+            return task.result()
+
+    async def aclose(self) -> None:
+        task, self._inflight = self._inflight, None
+        if task is not None and not task.done():
+            task.cancel()
+            await asyncio.wait((task,))
+        if task is not None and not task.cancelled():
+            task.exception()
+        await self._replay_stream.aclose()
 
 
 class BaseHTTPMiddleware[T]:
+    __slots__ = ("app", "dispatch_func")
+
     def __init__(self, app: ASGIApplication, dispatch: DispatchFunction | None = None) -> None:
         self.app = app
         self.dispatch_func = self.dispatch if dispatch is None else dispatch
@@ -76,114 +186,110 @@ class BaseHTTPMiddleware[T]:
             await self.app(scope, receive, send)
             return
 
-        http_scope = cast(HTTPScope, scope)
-        request = _CachedRequest(http_scope, receive)
-        wrapped_receive = request.wrapped_receive
-        response_sent = asyncio.Event()
+        request = _CachedRequest(cast(HTTPScope, scope), receive)
+        response_done: asyncio.Future[None] = asyncio.get_running_loop().create_future()
+        channel = _Channel()
         app_exc: Exception | None = None
-        exception_already_raised = False
-        messages: asyncio.Queue[Message] = asyncio.Queue(maxsize=1)
+        app_started = False
+        exc_reported = False
 
-        async def call_next(request: Request) -> Response:
-            async def receive_or_disconnect() -> ReceiveMessage:
-                if response_sent.is_set():
-                    return {"type": "http.disconnect"}
+        async def downstream_receive() -> ReceiveMessage:
+            if response_done.done():
+                return _disconnect()
+            return await request.receive_message(stop=response_done)
 
-                receive_task = asyncio.create_task(wrapped_receive())
-                sent_task = asyncio.create_task(response_sent.wait())
-
-                try:
-                    await asyncio.wait((receive_task, sent_task), return_when=asyncio.FIRST_COMPLETED)
-                finally:
-                    sent_task.cancel()
-                    if not receive_task.done():
-                        receive_task.cancel()
-                    await asyncio.wait((receive_task, sent_task))
-
-                if receive_task.cancelled():
-                    return {"type": "http.disconnect"}
-
-                message = receive_task.result()
-
-                if response_sent.is_set():
-                    return {"type": "http.disconnect"}
-
-                return message
-
-            async def send_no_error(message: Message) -> None:
-                try:
-                    await messages.put(message)
-                except asyncio.QueueShutDown:
-                    return
-
-                if message["type"] == "http.response.pathsend" or (
-                    message["type"] == "http.response.body" and not message.get("more_body", False)
-                ):
-                    await response_sent.wait()
-
-            async def coro() -> None:
-                nonlocal app_exc
-
-                try:
-                    await self.app(scope, receive_or_disconnect, send_no_error)
-                except Exception as exc:
-                    app_exc = exc
-                finally:
-                    messages.shutdown()
-
-            task_group.create_task(coro())
-
+        async def downstream_send(message: Message) -> None:
+            if response_done.done():
+                return
             try:
-                message = await messages.get()
-                info = message.get("info", None)
-                if message["type"] == "http.response.debug" and info is not None:
-                    message = await messages.get()
-            except asyncio.QueueShutDown:
-                if app_exc is not None:
-                    nonlocal exception_already_raised
-                    exception_already_raised = True
-                    raise app_exc from app_exc.__cause__ or app_exc.__context__
-                raise RuntimeError("No response returned.") from None
+                await channel.put(message)
+            except _ChannelClosed:
+                return
+            if message["type"] == "http.response.pathsend" or (
+                    message["type"] == "http.response.body" and not message.get("more_body", False)
+            ):
+                await response_done
+
+        async def run_app() -> None:
+            nonlocal app_exc
+            try:
+                await self.app(scope, downstream_receive, downstream_send)
+            except Exception as exc:
+                app_exc = exc
+            finally:
+                channel.close()
+
+        async def call_next(req: Request) -> Response:
+            nonlocal app_started, exc_reported
+            if req is not request:
+                raise ValueError("call_next() must receive the same request passed to dispatch()")
+            if app_started:
+                raise RuntimeError("call_next() may only be called once")
+            app_started = True
+            task_group.create_task(run_app())
+
+            info: Mapping[str, Any] | None = None
+            while True:
+                message = await _get_or_none(channel)
+                if message is None:
+                    if app_exc is not None:
+                        exc_reported = True
+                        raise app_exc
+                    raise RuntimeError("Application finished without sending a response")
+                if message["type"] != "http.response.debug":
+                    break
+                info = message.get("info", info)
 
             if message["type"] != "http.response.start":
-                raise RuntimeError(f"Expected an 'http.response.start' message, got: {message['type']!r}")
-            start_message = cast(HTTPResponseStartEvent, message)
+                raise RuntimeError(f"Expected 'http.response.start', got: {message['type']!r}")
+            start = cast(HTTPResponseStartEvent, message)
 
-            async def body_stream() -> BodyStreamGenerator:
+            async def body_stream() -> AsyncIterator[bytes | Message]:
+                nonlocal exc_reported
                 while True:
-                    try:
-                        message = await messages.get()
-                    except asyncio.QueueShutDown:
-                        break
-                    if message["type"] == "http.response.pathsend":
-                        yield message
-                        break
-                    if message["type"] != "http.response.body":
-                        raise RuntimeError(f"Unexpected message: {message}")
-                    body = message.get("body", b"")
+                    msg = await _get_or_none(channel)
+                    if msg is None:
+                        if app_exc is not None:
+                            exc_reported = True
+                            raise app_exc
+                        return
+
+                    mtype = msg["type"]
+                    if mtype == "http.response.debug":
+                        continue
+                    if mtype == "http.response.pathsend":
+                        yield msg
+                        return
+                    if mtype != "http.response.body":
+                        raise RuntimeError(f"Unexpected message from application: {mtype!r}")
+
+                    body = msg.get("body", b"")
                     if body:
                         yield body
-                    if not message.get("more_body", False):
-                        break
+                    if not msg.get("more_body", False):
+                        return
 
             response = _StreamingResponse(
-                status_code=start_message["status"],
+                status_code=start["status"],
                 content=body_stream(),
-                info=cast("Mapping[str, Any] | None", info),
+                info=info,
             )
-            response.raw_headers = list(start_message["headers"])
+            response.raw_headers = list(start["headers"])
             return response
 
         try:
             async with create_collapsing_task_group() as task_group:
-                response = await self.dispatch_func(request, call_next)
-                await response(scope, wrapped_receive, send)
-                response_sent.set()
-                messages.shutdown(immediate=True)
+                try:
+                    response = await self.dispatch_func(request, call_next)
+                    await response(scope, request.receive_message, send)
+                finally:
+                    if not response_done.done():
+                        response_done.set_result(None)
+                    channel.abort()
         finally:
-            messages.shutdown(immediate=True)
+            await request.aclose()
 
-        if app_exc is not None and not exception_already_raised:
+        if app_exc is not None and not exc_reported:
             raise app_exc
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
@@ -192,22 +298,22 @@ class BaseHTTPMiddleware[T]:
 
 class _StreamingResponse(Response):
     def __new__(
-        cls,
-        content: AsyncContentStream,
-        status_code: int = 200,
-        headers: Mapping[str, str] | None = None,
-        media_type: str | None = None,
-        info: Mapping[str, Any] | None = None,
+            cls,
+            content: AsyncContentStream,
+            status_code: int = 200,
+            headers: Mapping[str, str] | None = None,
+            media_type: str | None = None,
+            info: Mapping[str, Any] | None = None,
     ) -> Self:
         return super().__new__(cls, b"", status_code, headers, media_type, None)
 
     def __init__(
-        self,
-        content: AsyncContentStream,
-        status_code: int = 200,
-        headers: Mapping[str, str] | None = None,
-        media_type: str | None = None,
-        info: Mapping[str, Any] | None = None,
+            self,
+            content: AsyncContentStream,
+            status_code: int = 200,
+            headers: Mapping[str, str] | None = None,
+            media_type: str | None = None,
+            info: Mapping[str, Any] | None = None,
     ) -> None:
         if "content-length" in self.headers:
             del self.headers["content-length"]
@@ -219,15 +325,15 @@ class _StreamingResponse(Response):
             await send({"type": "http.response.debug", "info": self.info})
         await send({"type": "http.response.start", "status": self.status_code, "headers": self.raw_headers})
 
-        should_close_body = True
+        close_body = True
         async for chunk in self.body_iterator:
             if isinstance(chunk, dict):
-                should_close_body = False
+                close_body = False
                 await send(chunk)
-                continue
-            await send({"type": "http.response.body", "body": chunk, "more_body": True})
+            else:
+                await send({"type": "http.response.body", "body": chunk, "more_body": True})
 
-        if should_close_body:
+        if close_body:
             await send({"type": "http.response.body", "body": b"", "more_body": False})
 
         if self.background is not None:
