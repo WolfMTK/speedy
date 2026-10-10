@@ -1,5 +1,4 @@
 import inspect
-import sys
 import traceback
 from typing import cast
 
@@ -215,11 +214,7 @@ class ServerErrorMiddleware:
                 is_collapsed = True
         exc_html = "".join(exc_html_parts)
 
-        if sys.version_info >= (3, 13):
-            exc_type_str = traceback_obj.exc_type_str
-        else:
-            exc_type_str = traceback_obj.exc_type.__name__
-
+        exc_type_str = traceback_obj.exc_type_str
         error = f"{html_escape(exc_type_str)}: {html_escape(str(traceback_obj))}"
 
         return TEMPLATE.format(styles=STYLES, js=JS, error=error, exc_html=exc_html)

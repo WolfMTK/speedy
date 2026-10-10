@@ -1,7 +1,7 @@
+import asyncio
 from collections.abc import AsyncGenerator
 from typing import Any
 
-import anyio
 import orjson
 
 from speedy._speedy import MultiPartFormParser, parse_content_header, parse_urlencoded_form
@@ -40,7 +40,7 @@ class Request(_Request):
     def __init__(self, scope: HTTPScope, receive: Receive = empty_receive, send: Send = empty_send) -> None:
         pass
 
-    async def stream(self) -> AsyncGenerator[bytes, None]:
+    async def stream(self) -> AsyncGenerator[bytes]:
         """Yield the request body in chunks as it arrives."""
         if hasattr(self, "_body"):
             yield self._body
@@ -89,9 +89,12 @@ class Request(_Request):
         if self._is_disconnected:
             return True
         message: ReceiveMessage | dict[str, Any] = {}
-        with anyio.CancelScope() as scope:
-            scope.cancel()
-            message = await self.receive()
+        task = asyncio.Task(self.receive(), loop=asyncio.get_running_loop(), eager_start=True)
+        if task.done():
+            message = task.result()
+        else:
+            task.cancel()
+            await asyncio.wait([task])
         self._is_disconnected = message.get("type") == "http.disconnect"
         return self._is_disconnected
 

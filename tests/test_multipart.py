@@ -39,7 +39,6 @@ class TestMultiPartFormParser:
         with pytest.raises(ValidationException):
             parser.parse_body()
 
-    @pytest.mark.anyio
     async def test_parser_correct_fields(self):
         body = (
             b'--boundary\r\n'
@@ -73,7 +72,6 @@ class TestMultiPartFormParser:
         parsed_data = parser.parse()
         assert parsed_data == {}
 
-    @pytest.mark.anyio
     async def test_parser_complex_filename(self):
         body = (
             b'--boundary\r\n'

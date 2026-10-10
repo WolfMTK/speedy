@@ -623,6 +623,8 @@ class Request(HTTPConnection):
     @property
     def _send(self) -> Send: ...
 
+def parse_urlencoded_form(body: bytes) -> list[tuple[str, str]]: ...
+
 # routing.rs
 class RouteTree:
     """A thin wrapper around the matchit radix tree which maps path keys to integer ids."""

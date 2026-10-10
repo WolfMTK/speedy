@@ -1021,7 +1021,6 @@ class TestUploadFile:
 
 
 class TestFormMultiDict:
-    @pytest.mark.anyio
     async def test_form_multi_dict_close(self, mocker: MockFixture) -> None:
         close = mocker.patch('speedy.datastructures.UploadFile.close')
 

@@ -1,13 +1,14 @@
+import asyncio
 import os
 import stat
-from collections.abc import AsyncIterable, Awaitable, Mapping
+from collections.abc import AsyncIterable, AsyncIterator, Mapping
+from contextlib import asynccontextmanager
 from email.utils import formatdate
 from mimetypes import guess_type
 from secrets import token_hex
-from typing import Any, Self
+from typing import Any, BinaryIO, Self
 from urllib.parse import quote
 
-import anyio
 import orjson
 
 from speedy._speedy import (
@@ -40,6 +41,15 @@ __all__ = [
 def _has_content_length(headers: Mapping[str, str] | None) -> bool:
     """Whether the caller explicitly passed a ``content-length`` header."""
     return headers is not None and "content-length" in Headers(headers)
+
+
+@asynccontextmanager
+async def _open_file_async(path: str | os.PathLike[str], mode: str = "rb") -> AsyncIterator[BinaryIO]:
+    file = await asyncio.to_thread(open, path, mode)
+    try:
+        yield file
+    finally:
+        await asyncio.to_thread(file.close)
 
 
 class Response(_Response):
@@ -147,13 +157,10 @@ class StreamingResponse(Response):
                 raise ClientDisconnect() from None
         else:
             async with create_collapsing_task_group() as task_group:
-
-                async def run_and_cancel(coro: Awaitable[None]) -> None:
-                    await coro
-                    task_group.cancel_scope.cancel()
-
-                task_group.start_soon(run_and_cancel, self.stream_response(send))
-                await run_and_cancel(self.listen_for_disconnect(receive))
+                stream_task = task_group.create_task(self.stream_response(send))
+                disconnect_task = task_group.create_task(self.listen_for_disconnect(receive))
+                stream_task.add_done_callback(lambda _: disconnect_task.cancel())
+                disconnect_task.add_done_callback(lambda _: stream_task.cancel())
 
         if self.background is not None:
             await self.background()
@@ -233,7 +240,7 @@ class FileResponse(Response):
 
         if self.stat_result is None:
             try:
-                stat_result = await anyio.to_thread.run_sync(os.stat, self.path)
+                stat_result = await asyncio.to_thread(os.stat, self.path)
                 self.set_stat_headers(stat_result)
             except FileNotFoundError as exc:
                 raise RuntimeError(f"File at path {self.path} does not exist.") from exc
@@ -287,10 +294,10 @@ class FileResponse(Response):
         elif send_pathsend:
             await send({"type": "http.response.pathsend", "path": str(self.path)})
         else:
-            async with await anyio.open_file(self.path, mode="rb") as file:
+            async with _open_file_async(self.path, mode="rb") as file:
                 more_body = True
                 while more_body:
-                    chunk = await file.read(self.chunk_size)
+                    chunk = await asyncio.to_thread(file.read, self.chunk_size)
                     more_body = len(chunk) == self.chunk_size
                     await send({"type": "http.response.body", "body": chunk, "more_body": more_body})
 
@@ -304,11 +311,11 @@ class FileResponse(Response):
         if send_header_only:
             await send({"type": "http.response.body", "body": b"", "more_body": False})
         else:
-            async with await anyio.open_file(self.path, mode="rb") as file:
-                await file.seek(start)
+            async with _open_file_async(self.path, mode="rb") as file:
+                await asyncio.to_thread(file.seek, start)
                 more_body = True
                 while more_body:
-                    chunk = await file.read(min(self.chunk_size, end - start))
+                    chunk = await asyncio.to_thread(file.read, min(self.chunk_size, end - start))
                     start += len(chunk)
                     more_body = len(chunk) == self.chunk_size and start < end
                     await send({"type": "http.response.body", "body": chunk, "more_body": more_body})
@@ -331,13 +338,15 @@ class FileResponse(Response):
             await send({"type": "http.response.body", "body": b"", "more_body": False})
             return
 
-        async with await anyio.open_file(self.path, mode="rb") as file:
+        async with _open_file_async(self.path, mode="rb") as file:
             for start, end in ranges:
                 part_header = multipart_range_header(boundary, content_type, start, end, file_size)
                 await send({"type": "http.response.body", "body": part_header, "more_body": True})
-                await file.seek(start)
+                await asyncio.to_thread(file.seek, start)
                 while start < end:
-                    chunk = await file.read(min(self.chunk_size, end - start))
+                    chunk = await asyncio.to_thread(file.read, min(self.chunk_size, end - start))
+                    if not chunk:
+                        break
                     start += len(chunk)
                     await send({"type": "http.response.body", "body": chunk, "more_body": True})
                 await send({"type": "http.response.body", "body": b"\r\n", "more_body": True})

@@ -1,12 +1,10 @@
+import asyncio
 import itertools
-from asyncio import Task, current_task as asyncio_current_task
+import weakref
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator
 
-import anyio
 import pytest
-import sniffio
-import trio
 from speedy.application import Speedy
 from speedy.exceptions import WebSocketDisconnect
 from speedy.middleware import Middleware
@@ -26,16 +24,11 @@ def mock_service_endpoint(request: Request) -> JSONResponse:
 mock_service = Speedy(routes=[Route("/", endpoint=mock_service_endpoint)])
 
 
-def current_task() -> Task[Any] | trio.lowlevel.Task:
-    asynclib_name = sniffio.current_async_library()
-    if asynclib_name == "trio":
-        return trio.lowlevel.current_task()
-    if asynclib_name == "asyncio":
-        task = asyncio_current_task()
-        if task is None:
-            raise RuntimeError("must be called from a running task")
-        return task
-    raise RuntimeError(f"unsupported asynclib={asynclib_name}")
+def current_task() -> asyncio.Task[Any]:
+    task = asyncio.current_task()
+    if task is None:
+        raise RuntimeError("must be called from a running task")
+    return task
 
 
 def make_debug_app(info: dict[str, Any] | None = None) -> ASGIApplication:
@@ -108,14 +101,15 @@ class TestTestClient:
 
     def test_use_testclient_as_contextmanager(self, test_client_factory: TestClientFactory) -> None:
         counter = itertools.count()
-        identity_runvar = anyio.lowlevel.RunVar[int]("identity_runvar")
+        identity_per_loop: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, int] = weakref.WeakKeyDictionary()
 
         def get_identity() -> int:
+            loop = asyncio.get_running_loop()
             try:
-                return identity_runvar.get()
-            except LookupError:
+                return identity_per_loop[loop]
+            except KeyError:
                 token = next(counter)
-                identity_runvar.set(token)
+                identity_per_loop[loop] = token
                 return token
 
         startup_task = object()
@@ -129,7 +123,7 @@ class TestTestClient:
 
             startup_task = current_task()
             startup_loop = get_identity()
-            async with anyio.create_task_group():
+            async with asyncio.TaskGroup():
                 yield
             shutdown_task = current_task()
             shutdown_loop = get_identity()
@@ -224,8 +218,8 @@ class TestTestClient:
         async def app(scope: Scope, receive: Receive, send: Send) -> None:
             websocket = WebSocket(scope, receive=receive, send=send)
             await websocket.accept()
-            async with anyio.create_task_group() as task_group:
-                task_group.start_soon(respond, websocket)
+            async with asyncio.TaskGroup() as task_group:
+                task_group.create_task(respond(websocket))
                 try:
                     await websocket.receive_json()
                 except WebSocketDisconnect:
@@ -244,8 +238,8 @@ class TestTestClient:
             try:
                 websocket = WebSocket(scope, receive=receive, send=send)
                 await websocket.accept()
-                await anyio.sleep_forever()
-            except anyio.get_cancelled_exc_class():
+                await asyncio.get_running_loop().create_future()
+            except asyncio.CancelledError:
                 cancelled = True
                 raise
 

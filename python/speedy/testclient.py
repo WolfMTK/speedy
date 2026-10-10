@@ -1,21 +1,19 @@
+import asyncio
 import contextlib
+import inspect
 import io
 import json
-import math
+import threading
 from collections.abc import Awaitable, Callable, Generator, Iterable, Mapping, Sequence
 from concurrent.futures import Future
 from contextlib import AbstractContextManager
-from typing import Any, Literal, Self, TypedDict, cast
+from typing import Any, Literal, Self, cast
 from urllib.parse import unquote, urljoin
 
-import anyio
 import httpx2
-from anyio.streams.stapled import StapledObjectStream
 
 from speedy.exceptions import WebSocketDisconnect
 from speedy.types import Message, Receive, Scope, Send
-
-_PortalFactoryType = Callable[[], AbstractContextManager[anyio.from_thread.BlockingPortal]]
 
 ASGI3App = Callable[[Scope, Receive, Send], Awaitable[None]]
 
@@ -24,9 +22,51 @@ _RequestData = Mapping[str, str | Iterable[str] | bytes]
 _DEFAULT_PORTS = {"http": 80, "ws": 80, "https": 443, "wss": 443}
 
 
-class _AsyncBackend(TypedDict):
-    backend: str
-    backend_options: dict[str, Any]
+class _BlockingPortal:
+    def __init__(self) -> None:
+        self._loop = asyncio.new_event_loop()
+        self._thread = threading.Thread(
+            target=self._loop.run_forever,
+            name="testclient-event-loop",
+            daemon=True,
+        )
+
+    def __enter__(self) -> Self:
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc_info: Any) -> None:
+        try:
+            self.call(self._cancel_remaining_tasks)
+            self.call(self._loop.shutdown_asyncgens)
+        finally:
+            self._loop.call_soon_threadsafe(self._loop.stop)
+            self._thread.join()
+            self._loop.close()
+
+    @staticmethod
+    async def _cancel_remaining_tasks() -> None:
+        current = asyncio.current_task()
+        tasks = [task for task in asyncio.all_tasks() if task is not current]
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    @staticmethod
+    async def _invoke[T](func: Callable[..., T | Awaitable[T]], *args: Any) -> T:
+        result = func(*args)
+        if inspect.isawaitable(result):
+            return await result
+        return cast(T, result)
+
+    def start_task_soon[T](self, func: Callable[..., T | Awaitable[T]], *args: Any) -> Future[T]:
+        return asyncio.run_coroutine_threadsafe(self._invoke(func, *args), self._loop)
+
+    def call[T](self, func: Callable[..., T | Awaitable[T]], *args: Any) -> T:
+        return self.start_task_soon(func, *args).result()
+
+
+_PortalFactoryType = Callable[[], AbstractContextManager[_BlockingPortal]]
 
 
 class _Upgrade(Exception):
@@ -56,13 +96,17 @@ class WebSocketTestSession:
         self.accepted_subprotocol: str | None = None
         self.extra_headers: list[tuple[bytes, bytes]] | None = None
         self.portal_factory = portal_factory
+        self._task: asyncio.Task[None] | None = None
+        self._closing = False
 
     def __enter__(self) -> Self:
         with contextlib.ExitStack() as stack:
             self.portal = portal = stack.enter_context(self.portal_factory())
-            fut, cs = portal.start_task(self._run)
+            self._receive_queue = portal.call(asyncio.Queue[Message])
+            self._send_queue = portal.call(asyncio.Queue[Message | BaseException])
+            fut = portal.start_task_soon(self._run)
             stack.callback(fut.result)
-            stack.callback(portal.call, cs.cancel)
+            stack.callback(portal.call, self._cancel)
             self.send({"type": "websocket.connect"})
             message = self.receive()
             self._raise_on_close(message)
@@ -75,19 +119,25 @@ class WebSocketTestSession:
     def __exit__(self, *args: Any) -> bool | None:
         return self.exit_stack.__exit__(*args)
 
-    async def _run(self, *, task_status: anyio.abc.TaskStatus[anyio.CancelScope]) -> None:
-        send_tx, send_rx = anyio.create_memory_object_stream[Message](math.inf)
-        receive_tx, receive_rx = anyio.create_memory_object_stream[Message](math.inf)
-        with send_tx, send_rx, receive_tx, receive_rx, anyio.CancelScope() as cs:
-            self._receive_tx = receive_tx
-            self._send_rx = send_rx
-            task_status.started(cs)
-            await self.app(self.scope, receive_rx.receive, send_tx.send)
+    async def _run(self) -> None:
+        self._task = asyncio.current_task()
+        try:
+            await self.app(self.scope, self._receive_queue.get, self._send_queue.put)
+            await asyncio.get_running_loop().create_future()
+        except asyncio.CancelledError:
+            if not self._closing:
+                raise
+        except BaseException as exc:
+            self._send_queue.put_nowait(exc)
+            raise
 
-            await anyio.sleep_forever()
+    def _cancel(self) -> None:
+        self._closing = True
+        if self._task is not None:
+            self._task.cancel()
 
     def send(self, message: Message) -> None:
-        self.portal.call(self._receive_tx.send, message)
+        self.portal.call(self._receive_queue.put, message)
 
     def send_text(self, data: str) -> None:
         self.send({"type": "websocket.receive", "text": data})
@@ -106,7 +156,10 @@ class WebSocketTestSession:
         self.send({"type": "websocket.disconnect", "code": code, "reason": reason})
 
     def receive(self) -> Message:
-        return self.portal.call(self._send_rx.receive)
+        message = self.portal.call(self._send_queue.get)
+        if isinstance(message, BaseException):
+            raise message
+        return message
 
     def receive_text(self) -> str:
         message = self.receive()
@@ -216,7 +269,7 @@ class _TestClientTransport(httpx2.BaseTransport):
 
         request_complete = False
         response_started = False
-        response_complete: anyio.Event
+        response_complete: asyncio.Event
         raw_kwargs: dict[str, Any] = {"stream": io.BytesIO()}
         debug_info: dict[str, Any] | None = None
 
@@ -258,7 +311,7 @@ class _TestClientTransport(httpx2.BaseTransport):
 
         try:
             with self.portal_factory() as portal:
-                response_complete = portal.call(anyio.Event)
+                response_complete = portal.call(asyncio.Event)
                 portal.call(self.app, scope, receive, send)
         except BaseException:
             if self.raise_server_exceptions:
@@ -288,7 +341,7 @@ class _TestClientTransport(httpx2.BaseTransport):
 class TestClient(httpx2.Client):
     __test__ = False
     task: Future[None]
-    portal: anyio.from_thread.BlockingPortal | None = None
+    portal: _BlockingPortal | None = None
 
     def __init__(
         self,
@@ -296,14 +349,11 @@ class TestClient(httpx2.Client):
         base_url: str = "http://testserver",
         raise_server_exceptions: bool = True,
         root_path: str = "",
-        backend: Literal["asyncio", "trio"] = "asyncio",
-        backend_options: dict[str, Any] | None = None,
         cookies: httpx2._types.CookieTypes | None = None,
         headers: dict[str, str] | None = None,
         follow_redirects: bool = True,
         client: tuple[str, int] = ("testclient", 50000),
     ) -> None:
-        self.async_backend = _AsyncBackend(backend=backend, backend_options=backend_options or {})
         self.app: ASGI3App = app
         self.app_state: dict[str, Any] = {}
         transport = _TestClientTransport(
@@ -326,11 +376,11 @@ class TestClient(httpx2.Client):
         )
 
     @contextlib.contextmanager
-    def _portal_factory(self) -> Generator[anyio.from_thread.BlockingPortal, None, None]:
+    def _portal_factory(self) -> Generator[_BlockingPortal]:
         if self.portal is not None:
             yield self.portal
         else:
-            with anyio.from_thread.start_blocking_portal(**self.async_backend) as portal:
+            with _BlockingPortal() as portal:
                 yield portal
 
     def websocket_connect(
@@ -355,18 +405,14 @@ class TestClient(httpx2.Client):
 
     def __enter__(self) -> Self:
         with contextlib.ExitStack() as stack:
-            self.portal = portal = stack.enter_context(anyio.from_thread.start_blocking_portal(**self.async_backend))
+            self.portal = portal = stack.enter_context(_BlockingPortal())
 
             @stack.callback
             def reset_portal() -> None:
                 self.portal = None
 
-            send = anyio.create_memory_object_stream[Message | None](math.inf)
-            receive = anyio.create_memory_object_stream[Message](math.inf)
-            for channel in (*send, *receive):
-                stack.callback(channel.close)
-            self.stream_send = StapledObjectStream(*send)
-            self.stream_receive = StapledObjectStream(*receive)
+            self._lifespan_to_app = portal.call(asyncio.Queue[Message])
+            self._lifespan_from_app = portal.call(asyncio.Queue[Message | BaseException | None])
             self.task = portal.start_task_soon(self.lifespan)
             portal.call(self.wait_startup)
 
@@ -384,12 +430,15 @@ class TestClient(httpx2.Client):
     async def lifespan(self) -> None:
         scope = {"type": "lifespan", "state": self.app_state}
         try:
-            await self.app(scope, self.stream_receive.receive, self.stream_send.send)
-        finally:
-            await self.stream_send.send(None)
+            await self.app(scope, self._lifespan_to_app.get, self._lifespan_from_app.put)
+        except BaseException as exc:
+            self._lifespan_from_app.put_nowait(exc)
+            raise
+        else:
+            self._lifespan_from_app.put_nowait(None)
 
     async def wait_startup(self) -> None:
-        await self.stream_receive.send({"type": "lifespan.startup"})
+        await self._lifespan_to_app.put({"type": "lifespan.startup"})
 
         message = await self._receive_lifespan_message()
         if message["type"] not in ("lifespan.startup.complete", "lifespan.startup.failed"):
@@ -398,7 +447,7 @@ class TestClient(httpx2.Client):
             await self._receive_lifespan_message()
 
     async def wait_shutdown(self) -> None:
-        await self.stream_receive.send({"type": "lifespan.shutdown"})
+        await self._lifespan_to_app.put({"type": "lifespan.shutdown"})
         message = await self._receive_lifespan_message()
         if message["type"] not in ("lifespan.shutdown.complete", "lifespan.shutdown.failed"):
             raise RuntimeError(f"Unexpected message during lifespan shutdown: {message['type']!r}")
@@ -406,7 +455,7 @@ class TestClient(httpx2.Client):
             await self._receive_lifespan_message()
 
     async def _receive_lifespan_message(self) -> Message:
-        message = await self.stream_send.receive()
-        if message is None:
-            self.task.result()
+        message = await self._lifespan_from_app.get()
+        if isinstance(message, BaseException):
+            raise message
         return cast(Message, message)

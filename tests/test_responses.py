@@ -1,3 +1,4 @@
+import asyncio
 import datetime as dt
 import sys
 import time
@@ -7,10 +8,7 @@ from http.cookies import SimpleCookie
 from pathlib import Path
 from typing import Any
 
-import anyio
 import pytest
-
-
 from speedy import status
 from speedy.background import BackgroundTask
 from speedy.datastructures import Headers
@@ -145,7 +143,7 @@ class TestStreamingResponses:
                     yield str(i)
                     if i != maximum:
                         yield ", "
-                    await anyio.sleep(0)
+                    await asyncio.sleep(0)
 
             async def numbers_for_cleanup(start: int = 1, stop: int = 5) -> None:
                 nonlocal filled_by_bg_task
@@ -214,11 +212,10 @@ class TestStreamingResponses:
         response = client.get("/")
         assert response.content == b"\xc0\xf5"
 
-    @pytest.mark.anyio
     async def test_streaming_response_stops_if_receiving_http_disconnect(self) -> None:
         streamed = 0
 
-        disconnected = anyio.Event()
+        disconnected = asyncio.Event()
 
         async def receive_disconnect() -> Message:
             await disconnected.wait()
@@ -233,16 +230,15 @@ class TestStreamingResponses:
 
         async def stream_indefinitely() -> AsyncIterator[bytes]:
             while True:
-                await anyio.sleep(0)
+                await asyncio.sleep(0)
                 yield b"chunk "
 
         response = StreamingResponse(content=stream_indefinitely())
 
-        with anyio.move_on_after(1) as cancel_scope:
+        async with asyncio.timeout(1) as timeout_cm:
             await response({"type": "http"}, receive_disconnect, send)
-        assert not cancel_scope.cancel_called, "Content streaming should stop itself."
+        assert not timeout_cm.expired(), "Content streaming should stop itself."
 
-    @pytest.mark.anyio
     async def test_streaming_response_on_client_disconnects(self) -> None:
         chunks = bytearray()
         streamed = False
@@ -261,20 +257,19 @@ class TestStreamingResponses:
 
         async def stream_indefinitely() -> AsyncGenerator[bytes, None]:
             while True:
-                await anyio.sleep(0)
+                await asyncio.sleep(0)
                 yield b"chunk"
 
         stream = stream_indefinitely()
         response = StreamingResponse(content=stream)
 
-        with anyio.move_on_after(1) as cancel_scope:
+        async with asyncio.timeout(1) as timeout_cm:
             with pytest.raises(ClientDisconnect):
                 await response({"type": "http", "asgi": {"spec_version": "2.4"}}, receive_disconnect, send)
-        assert not cancel_scope.cancel_called, "Content streaming should stop itself."
+        assert not timeout_cm.expired(), "Content streaming should stop itself."
         assert chunks == b"chunk"
         await stream.aclose()
 
-    @pytest.mark.anyio
     async def test_streaming_response_runs_background_on_websocket_scope(self) -> None:
         background_called = False
         sent: list[Message] = []
@@ -317,7 +312,7 @@ class TestFileResponses:
                 yield str(i)
                 if i != maximum:
                     yield ", "
-                await anyio.sleep(0)
+                await asyncio.sleep(0)
 
         async def numbers_for_cleanup(start: int = 1, stop: int = 5) -> None:
             nonlocal filled_by_bg_task
@@ -353,7 +348,6 @@ class TestFileResponses:
         response = client.get("/")
         assert response.headers["content-length"] == str(len(content))
 
-    @pytest.mark.anyio
     async def test_file_response_on_head_method(self, tmp_path: Path) -> None:
         path = tmp_path / "xyz"
         content = b"<file content>" * 1000
@@ -466,7 +460,6 @@ class TestFileResponses:
         assert response.headers["content-length"] == "5"
         assert response.headers["content-range"] == f"bytes 0-4/{len(content)}"
 
-    @pytest.mark.anyio
     async def test_file_response_with_pathsend(self, tmp_path: Path) -> None:
         path = tmp_path / "xyz"
         content = b"<file content>" * 1000
@@ -523,8 +516,9 @@ class TestCookies:
         response = client.get("/")
         assert response.text == "Hello, world!"
         assert (
-                response.headers["set-cookie"] == "mycookie=myvalue; Domain=localhost; expires=Thu, 22 Jan 2037 12:00:10 GMT; "
-                                                  f"HttpOnly; Max-Age=10; {partitioned_text}Path=/; SameSite=none; Secure"
+                response.headers[
+                    "set-cookie"] == "mycookie=myvalue; Domain=localhost; expires=Thu, 22 Jan 2037 12:00:10 GMT; "
+                                     f"HttpOnly; Max-Age=10; {partitioned_text}Path=/; SameSite=none; Secure"
         )
 
     @pytest.mark.skipif(sys.version_info >= (3, 14), reason="Only relevant for <3.14")
@@ -898,7 +892,6 @@ class TestFileResponseRanges:
                 == b"ds required in the Web framework. No redundant implementation means that you can freely customize fun"
         )
 
-    @pytest.mark.anyio
     async def test_multi_small_chunk_size(self, readme_file: Path) -> None:
         class SmallChunkSizeFileResponse(FileResponse):
             chunk_size = 10

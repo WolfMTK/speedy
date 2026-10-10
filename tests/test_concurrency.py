@@ -7,7 +7,6 @@ import pytest
 from speedy.concurrency import run_in_threadpool, _next_batch, iterate_in_threadpool, is_async_callable
 
 
-@pytest.mark.anyio
 async def test_positional_args() -> None:
     def add(a: int, b: int) -> int:
         return a + b
@@ -15,7 +14,6 @@ async def test_positional_args() -> None:
     assert await run_in_threadpool(add, 2, 3) == 5
 
 
-@pytest.mark.anyio
 async def test_keyword_args() -> None:
     def greet(name: str, *, greeting: str = "hello") -> str:
         return f"{greeting}, {name}"
@@ -23,7 +21,6 @@ async def test_keyword_args() -> None:
     assert await run_in_threadpool(greet, "world", greeting="hi") == "hi, world"
 
 
-@pytest.mark.anyio
 async def test_no_args() -> None:
     def constant() -> int:
         return 42
@@ -31,7 +28,6 @@ async def test_no_args() -> None:
     assert await run_in_threadpool(constant) == 42
 
 
-@pytest.mark.anyio
 async def test_runs_in_a_different_thread() -> None:
     caller_thread = threading.get_ident()
 
@@ -42,7 +38,6 @@ async def test_runs_in_a_different_thread() -> None:
     assert worker_thread != caller_thread
 
 
-@pytest.mark.anyio
 async def test_propagates_exception() -> None:
     def boom() -> None:
         raise ValueError("boom")
@@ -85,7 +80,6 @@ def test_batch_size_one_matches_single_next() -> None:
     assert exhausted is False
 
 
-@pytest.mark.anyio
 async def test_basic_iteration() -> None:
     class CustomIterable:
         def __iter__(self) -> Iterator[int]:
@@ -94,18 +88,15 @@ async def test_basic_iteration() -> None:
     assert [v async for v in iterate_in_threadpool(CustomIterable())] == [0, 1, 2]
 
 
-@pytest.mark.anyio
 async def test_plain_list() -> None:
     assert [v async for v in iterate_in_threadpool([1, 2, 3])] == [1, 2, 3]
 
 
-@pytest.mark.anyio
 async def test_empty_iterable() -> None:
     empty: list[int] = []
     assert [v async for v in iterate_in_threadpool(empty)] == []
 
 
-@pytest.mark.anyio
 async def test_generator_source() -> None:
     def gen() -> Iterator[int]:
         yield 1
@@ -115,7 +106,6 @@ async def test_generator_source() -> None:
     assert [v async for v in iterate_in_threadpool(gen())] == [1, 2, 3]
 
 
-@pytest.mark.anyio
 @pytest.mark.parametrize("batch_size", [1, 2, 3, 4, 10])
 async def test_preserves_order_across_batch_sizes(batch_size: int) -> None:
     data = list(range(7))
@@ -123,13 +113,11 @@ async def test_preserves_order_across_batch_sizes(batch_size: int) -> None:
     assert result == data
 
 
-@pytest.mark.anyio
 async def test_batch_size_larger_than_source_is_not_exhausted_early() -> None:
     result = [v async for v in iterate_in_threadpool([1, 2], batch_size=100)]
     assert result == [1, 2]
 
 
-@pytest.mark.anyio
 async def test_non_stop_iteration_error_propagates() -> None:
     def gen() -> Iterator[int]:
         yield 1
@@ -142,7 +130,6 @@ async def test_non_stop_iteration_error_propagates() -> None:
     assert collected == [1]
 
 
-@pytest.mark.anyio
 async def test_iterate_runs_in_a_different_thread() -> None:
     caller_thread = threading.get_ident()
 

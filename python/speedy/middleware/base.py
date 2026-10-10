@@ -1,7 +1,6 @@
-from collections.abc import Awaitable, Callable, Mapping
+import asyncio
+from collections.abc import Mapping
 from typing import Any, Self, cast
-
-import anyio
 
 from speedy.concurrency import create_collapsing_task_group
 from speedy.exceptions import ClientDisconnect
@@ -80,24 +79,31 @@ class BaseHTTPMiddleware[T]:
         http_scope = cast(HTTPScope, scope)
         request = _CachedRequest(http_scope, receive)
         wrapped_receive = request.wrapped_receive
-        response_sent = anyio.Event()
+        response_sent = asyncio.Event()
         app_exc: Exception | None = None
         exception_already_raised = False
+        messages: asyncio.Queue[Message] = asyncio.Queue(maxsize=1)
 
         async def call_next(request: Request) -> Response:
             async def receive_or_disconnect() -> ReceiveMessage:
                 if response_sent.is_set():
                     return {"type": "http.disconnect"}
 
-                async with anyio.create_task_group() as task_group:
+                receive_task = asyncio.create_task(wrapped_receive())
+                sent_task = asyncio.create_task(response_sent.wait())
 
-                    async def wrap[T](func: Callable[[], Awaitable[T]]) -> T:
-                        result = await func()
-                        task_group.cancel_scope.cancel()
-                        return result
+                try:
+                    await asyncio.wait((receive_task, sent_task), return_when=asyncio.FIRST_COMPLETED)
+                finally:
+                    sent_task.cancel()
+                    if not receive_task.done():
+                        receive_task.cancel()
+                    await asyncio.wait((receive_task, sent_task))
 
-                    task_group.start_soon(wrap, response_sent.wait)
-                    message = await wrap(wrapped_receive)
+                if receive_task.cancelled():
+                    return {"type": "http.disconnect"}
+
+                message = receive_task.result()
 
                 if response_sent.is_set():
                     return {"type": "http.disconnect"}
@@ -106,8 +112,8 @@ class BaseHTTPMiddleware[T]:
 
             async def send_no_error(message: Message) -> None:
                 try:
-                    await send_stream.send(message)
-                except anyio.BrokenResourceError:
+                    await messages.put(message)
+                except asyncio.QueueShutDown:
                     return
 
                 if message["type"] == "http.response.pathsend" or (
@@ -118,20 +124,21 @@ class BaseHTTPMiddleware[T]:
             async def coro() -> None:
                 nonlocal app_exc
 
-                with send_stream:
-                    try:
-                        await self.app(scope, receive_or_disconnect, send_no_error)
-                    except Exception as exc:
-                        app_exc = exc
+                try:
+                    await self.app(scope, receive_or_disconnect, send_no_error)
+                except Exception as exc:
+                    app_exc = exc
+                finally:
+                    messages.shutdown()
 
-            task_group.start_soon(coro)
+            task_group.create_task(coro())
 
             try:
-                message = await recv_stream.receive()
+                message = await messages.get()
                 info = message.get("info", None)
                 if message["type"] == "http.response.debug" and info is not None:
-                    message = await recv_stream.receive()
-            except anyio.EndOfStream:
+                    message = await messages.get()
+            except asyncio.QueueShutDown:
                 if app_exc is not None:
                     nonlocal exception_already_raised
                     exception_already_raised = True
@@ -143,7 +150,11 @@ class BaseHTTPMiddleware[T]:
             start_message = cast(HTTPResponseStartEvent, message)
 
             async def body_stream() -> BodyStreamGenerator:
-                async for message in recv_stream:
+                while True:
+                    try:
+                        message = await messages.get()
+                    except asyncio.QueueShutDown:
+                        break
                     if message["type"] == "http.response.pathsend":
                         yield message
                         break
@@ -163,13 +174,15 @@ class BaseHTTPMiddleware[T]:
             response.raw_headers = list(start_message["headers"])
             return response
 
-        send_stream, recv_stream = anyio.create_memory_object_stream[Message]()
-        with recv_stream, send_stream:
+        try:
             async with create_collapsing_task_group() as task_group:
                 response = await self.dispatch_func(request, call_next)
                 await response(scope, wrapped_receive, send)
                 response_sent.set()
-                recv_stream.close()
+                messages.shutdown(immediate=True)
+        finally:
+            messages.shutdown(immediate=True)
+
         if app_exc is not None and not exception_already_raised:
             raise app_exc
 
