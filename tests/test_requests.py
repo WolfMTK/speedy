@@ -1,8 +1,8 @@
+import asyncio
 import sys
 from collections.abc import Iterator
 from typing import Any
 
-import anyio
 import pytest
 
 from speedy.application import Speedy
@@ -276,7 +276,6 @@ class TestRequestBody:
             ),
         ],
     )
-    @pytest.mark.anyio
     async def test_receive_messages(self, messages: list[Message]) -> None:
         messages = messages.copy()
 
@@ -284,12 +283,9 @@ class TestRequestBody:
             return {"type": "http.request", **messages.pop(0)}
 
         request = Request({"type": "http"}, rcv)
-
         body = await request.body()
-
         assert body == b"123"
 
-    @pytest.mark.anyio
     async def test_stream_called_twice(self) -> None:
         messages: list[Message] = [
             {"type": "http.request", "body": b"1", "more_body": True},
@@ -352,11 +348,7 @@ class TestRequestForm:
 
 
 class TestRequestDisconnect:
-    def test_disconnect_while_reading_body(
-            self,
-            anyio_backend_name: str,
-            anyio_backend_options: dict[str, Any],
-    ) -> None:
+    def test_disconnect_while_reading_body(self) -> None:
         async def app(scope: Scope, receive: Receive, send: Send) -> None:
             request = Request(scope, receive)
             await request.body()
@@ -366,14 +358,7 @@ class TestRequestDisconnect:
 
         scope = {"type": "http", "method": "POST", "path": "/"}
         with pytest.raises(ClientDisconnect):
-            anyio.run(
-                app,
-                scope,
-                receiver,
-                None,
-                backend=anyio_backend_name,
-                backend_options=anyio_backend_options,
-            )
+            asyncio.run(app(scope, receiver, None))
 
     def test_is_disconnected(self, test_client_factory: TestClientFactory) -> None:
         disconnected_after_response = None

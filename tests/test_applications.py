@@ -2,7 +2,6 @@ from collections.abc import AsyncGenerator, AsyncIterator, Callable, Generator
 from contextlib import asynccontextmanager
 from typing import TypedDict
 
-import anyio.from_thread
 import pytest
 from speedy import status
 from speedy.application import Speedy
@@ -87,8 +86,8 @@ async def websocket_state(websocket: WebSocket) -> None:
     await websocket.close()
 
 
-def custom_ws_exception_handler(websocket: WebSocket, exc: CustomWSException) -> None:
-    anyio.from_thread.run(websocket.close, status.WS_1013_TRY_AGAIN_LATER)
+async def custom_ws_exception_handler(websocket: WebSocket, exc: CustomWSException) -> None:
+    await websocket.close(status.WS_1013_TRY_AGAIN_LATER)
 
 
 @asynccontextmanager

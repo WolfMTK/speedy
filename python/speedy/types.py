@@ -293,7 +293,7 @@ type RequestResponseEndpoint = Callable[[Request], Awaitable[Response]]
 
 type DispatchFunction = Callable[[Request, RequestResponseEndpoint], Awaitable[Response]]
 
-type BodyStreamGenerator = AsyncGenerator[bytes | MutableMapping[str, Any], None]
+type BodyStreamGenerator = AsyncGenerator[bytes | MutableMapping[str, Any]]
 
 type AsyncContentStream = AsyncIterable[Content | MutableMapping[str, Any]]
 

@@ -1,20 +1,14 @@
+import asyncio
 import functools
-import sys
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Generator, Iterable, Iterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from inspect import iscoroutinefunction
 from typing import Any, Protocol, TypeGuard, TypeVar
-
-import anyio.to_thread
-
-if sys.version_info >= (3, 13):
-    from inspect import iscoroutinefunction
-else:
-    from asyncio import iscoroutinefunction
 
 
 async def run_in_threadpool[**P, T](func: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
     func = functools.partial(func, *args, **kwargs)
-    return await anyio.to_thread.run_sync(func)
+    return await asyncio.to_thread(func)
 
 
 def _next_batch[T](iterator: Iterator[T], batch_size: int) -> tuple[list[T], bool]:
@@ -33,7 +27,7 @@ async def iterate_in_threadpool[T](
 ) -> AsyncIterator[T]:
     as_iterator = iter(iterator)
     while True:
-        items, exhausted = await anyio.to_thread.run_sync(_next_batch, as_iterator, batch_size)
+        items, exhausted = await asyncio.to_thread(_next_batch, as_iterator, batch_size)
         for item in items:
             yield item
         if exhausted:
@@ -90,9 +84,9 @@ class AwaitableOrContextManagerWrapper:
 
 
 @asynccontextmanager
-async def create_collapsing_task_group() -> AsyncGenerator[anyio.abc.TaskGroup, None]:
+async def create_collapsing_task_group() -> AsyncGenerator[asyncio.TaskGroup]:
     try:
-        async with anyio.create_task_group() as tg:
+        async with asyncio.TaskGroup() as tg:
             yield tg
     except BaseExceptionGroup as excs:
         if len(excs.exceptions) != 1:

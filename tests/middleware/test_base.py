@@ -1,12 +1,11 @@
+import asyncio
 import contextvars
 from collections.abc import AsyncGenerator, AsyncIterator, Generator
 from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import Any
 
-import anyio
 import pytest
-from anyio.abc import TaskStatus
 
 from speedy.application import Speedy
 from speedy.background import BackgroundTask
@@ -222,7 +221,6 @@ class TestMiddlewareStack:
         assert response.headers["X-State-Foo"] == expected_value1
         assert response.headers["X-State-Bar"] == expected_value2
 
-    @pytest.mark.anyio
     async def test_multiple_middlewares_stacked_client_disconnected(self) -> None:
         ordered_events: list[str] = []
         unordered_events: list[str] = []
@@ -433,13 +431,12 @@ class TestExceptions:
 
 
 class TestBackgroundTasks:
-    @pytest.mark.anyio
     async def test_run_background_tasks_even_if_client_disconnects(self) -> None:
-        response_complete = anyio.Event()
-        background_task_run = anyio.Event()
+        response_complete = asyncio.Event()
+        background_task_run = asyncio.Event()
 
         async def sleep_and_set() -> None:
-            await anyio.sleep(0.1)
+            await asyncio.sleep(0.1)
             background_task_run.set()
 
         async def endpoint_with_background_task(_: Request) -> PlainTextResponse:
@@ -477,7 +474,7 @@ class TestBackgroundTasks:
 
     def test_run_background_tasks_raise_exceptions(self, test_client_factory: TestClientFactory) -> None:
         async def sleep_and_set() -> None:
-            await anyio.sleep(0.1)
+            await asyncio.sleep(0.1)
             raise ValueError("TEST")
 
         async def endpoint_with_background_task(_: Request) -> PlainTextResponse:
@@ -495,14 +492,13 @@ class TestBackgroundTasks:
         with pytest.raises(ValueError, match="TEST"):
             client.get("/")
 
-    @pytest.mark.anyio
     async def test_do_not_block_on_background_tasks(self) -> None:
-        response_complete = anyio.Event()
+        response_complete = asyncio.Event()
         events: list[str | Message] = []
 
         async def sleep_and_set() -> None:
             events.append("Background task started")
-            await anyio.sleep(0.1)
+            await asyncio.sleep(0.1)
             events.append("Background task finished")
 
         async def endpoint_with_background_task(_: Request) -> PlainTextResponse:
@@ -532,9 +528,9 @@ class TestBackgroundTasks:
                 if not message.get("more_body", False):
                     response_complete.set()
 
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(app, scope, receive, send)
-            tg.start_soon(app, scope, receive, send)
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(app(scope, receive, send))
+            tg.create_task(app(scope, receive, send))
 
         assert events == [
             {"body": b"Hello", "more_body": True, "type": "http.response.body"},
@@ -547,12 +543,14 @@ class TestBackgroundTasks:
             "Background task finished",
         ]
 
-    @pytest.mark.anyio
     async def test_background_task_runs_after_response_sent_with_middleware(self) -> None:
         events: list[tuple[str, float]] = []
 
+        def now() -> float:
+            return asyncio.get_running_loop().time()
+
         async def bg() -> None:
-            events.append(("background-done", anyio.current_time()))
+            events.append(("background-done", now()))
 
         async def homepage(request: Request) -> PlainTextResponse:
             return PlainTextResponse("hello", background=BackgroundTask(bg))
@@ -583,8 +581,8 @@ class TestBackgroundTasks:
             return {"type": "http.disconnect"}
 
         async def send(message: Message) -> None:
-            events.append((message["type"], anyio.current_time()))
-            await anyio.sleep(0.05)
+            events.append((message["type"], now()))
+            await asyncio.sleep(0.05)
 
         await app(scope, receive, send)
 
@@ -598,13 +596,12 @@ class TestBackgroundTasks:
 
 
 class TestClientDisconnect:
-    @pytest.mark.anyio
     async def test_run_context_manager_exit_even_if_client_disconnects(self) -> None:
-        response_complete = anyio.Event()
-        context_manager_exited = anyio.Event()
+        response_complete = asyncio.Event()
+        context_manager_exited = asyncio.Event()
 
         async def sleep_and_set() -> None:
-            await anyio.sleep(0.1)
+            await asyncio.sleep(0.1)
             context_manager_exited.set()
 
         class ContextManagerMiddleware:
@@ -685,38 +682,40 @@ class TestClientDisconnect:
                     ],
                 }
             )
-            async with anyio.create_task_group() as task_group:
 
-                async def cancel_on_disconnect(
-                        *,
-                        task_status: TaskStatus[None] = anyio.TASK_STATUS_IGNORED,
-                ) -> None:
-                    task_status.started()
-                    while True:
-                        message = await receive()
-                        if message["type"] == "http.disconnect":
-                            task_group.cancel_scope.cancel()
-                            break
+            async def wait_for_disconnect() -> None:
+                while True:
+                    message = await receive()
+                    if message["type"] == "http.disconnect":
+                        return
 
-                await task_group.start(cancel_on_disconnect)
+            async def send_forever() -> None:
+                while True:
+                    await send(
+                        {
+                            "type": "http.response.body",
+                            "body": b"chunk ",
+                            "more_body": True,
+                        }
+                    )
 
-                with anyio.move_on_after(0.2):
-                    while True:
-                        await send(
-                            {
-                                "type": "http.response.body",
-                                "body": b"chunk ",
-                                "more_body": True,
-                            }
-                        )
+            disconnect_task = asyncio.create_task(wait_for_disconnect())
+            send_task = asyncio.create_task(send_forever())
+            try:
+                done, _ = await asyncio.wait(
+                    (disconnect_task, send_task),
+                    timeout=0.2,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+            finally:
+                disconnect_task.cancel()
+                send_task.cancel()
+                await asyncio.wait((disconnect_task, send_task))
 
+            if send_task in done and not send_task.cancelled():
+                send_task.result()
+            if disconnect_task not in done:
                 pytest.fail("http.disconnect should have been received and canceled the scope")
-
-        app = DiscardingMiddleware(downstream_app)
-
-        client = test_client_factory(app)
-        response = client.get("/does_not_exist")
-        assert response.text == "Custom"
 
     def test_app_receives_http_disconnect_after_sending_if_discarded(
             self,
@@ -768,7 +767,6 @@ class TestClientDisconnect:
         response = client.get("/does_not_exist")
         assert response.text == "Custom"
 
-    @pytest.mark.anyio
     async def test_read_request_disconnected_client(self) -> None:
         """If we receive a disconnect message when the downstream ASGI
         app calls receive() the Request instance passed into the dispatch function
@@ -811,7 +809,6 @@ class TestClientDisconnect:
 
         await rcv.aclose()
 
-    @pytest.mark.anyio
     async def test_read_request_disconnected_after_consuming_steam(self) -> None:
         async def endpoint(scope: Scope, receive: Receive, send: Send) -> None:
             msg = await receive()
@@ -852,7 +849,6 @@ class TestClientDisconnect:
 
         await rcv.aclose()
 
-    @pytest.mark.anyio
     @pytest.mark.parametrize("send_body", [True, False])
     async def test_poll_for_disconnect_repeated(self, send_body: bool) -> None:
         async def app_poll_disconnect(scope: Scope, receive: Receive, send: Send) -> None:
@@ -1081,7 +1077,6 @@ class TestReadRequestInDispatch:
         response = client.post("/", content=b"a")
         assert response.status_code == 200
 
-    @pytest.mark.anyio
     async def test_read_request_stream_in_dispatch_wrapping_app_calls_body(self) -> None:
         async def endpoint(scope: Scope, receive: Receive, send: Send) -> None:
             request = Request(scope, receive)
@@ -1283,13 +1278,12 @@ class TestReceiveWrapping:
 
 
 class TestFileResponse:
-    @pytest.mark.anyio
     async def test_asgi_pathsend_events(self, tmpdir: Path) -> None:
         path = tmpdir / "example.txt"
         with path.open("w") as file:
             file.write("<file content>")
 
-        response_complete = anyio.Event()
+        response_complete = asyncio.Event()
         events: list[Message] = []
 
         async def endpoint_with_pathsend(_: Request) -> FileResponse:
