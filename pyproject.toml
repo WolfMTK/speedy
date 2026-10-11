@@ -38,7 +38,7 @@ dev = [
     "tox>=4.64.9",
     "ruff>=0.16.10",
     "pytest-mock>=3.16.0",
-    "httpx2[zstd]<=2.13.1",
+    "zapros<=0.20.0",
 ]
 
 [tool.maturin]
@@ -47,7 +47,7 @@ module-name = "speedy._speedy"
 
 [tool.tox]
 requires = ["tox>=4.64.9", "tox-uv>=0.11.0"]
-env_list = ["3.13", "3.14"]
+env_list = ["3.13", "3.14", "3.15"]
 
 [tool.tox.env_run_base]
 description = "Run test under {base_python}"
