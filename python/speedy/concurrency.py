@@ -56,7 +56,7 @@ class AsyncCallable[**P, T]:
         return run_in_threadpool(self.function, *args, **kwargs)
 
 
-class AwaitableOrContextManager[T_co](Awaitable[T_co], AbstractAsyncContextManager[T_co], Protocol[T_co]): ...
+class AwaitableOrContextManager[T_co](Awaitable[T_co], AbstractAsyncContextManager[T_co], Protocol): ...
 
 
 class SupportsAsyncClose(Protocol):

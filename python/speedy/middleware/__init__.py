@@ -4,7 +4,7 @@ from typing import Any, Protocol
 from speedy.types import ASGIApplication
 
 
-class _AbstractMiddleware[**P](Protocol[P]):
+class _AbstractMiddleware[**P](Protocol):
     def __call__(self, app: ASGIApplication, /, *args: P.args, **kwargs: P.kwargs) -> ASGIApplication: ...
 
 

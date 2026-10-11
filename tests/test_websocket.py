@@ -1,10 +1,9 @@
+import asyncio
 import sys
 from pathlib import Path
 from typing import Any, AsyncGenerator, MutableMapping
 
-import anyio
 import pytest
-from anyio.abc import ObjectReceiveStream, ObjectSendStream
 from speedy import status
 from speedy.exceptions import WebSocketDisconnect, WebSocketDisconnected
 from speedy.responses import FileResponse, Response, StreamingResponse
@@ -66,7 +65,6 @@ class TestWebSocketBasics:
 
         client = test_client_factory(app)
         with client.websocket_connect("/") as websocket:
-
             probe_request = client.build_request("GET", "/")
             accept_encoding = probe_request.headers["accept-encoding"]
             expected_headers = {
@@ -172,7 +170,8 @@ class TestWebSocketSendReceive:
         ("send_name", "receive_name", "payload", "wrap"),
         [
             pytest.param("send_text", "receive_text", "Hello, world!", lambda data: "Message was: " + data, id="text"),
-            pytest.param("send_bytes", "receive_bytes", b"Hello, world!", lambda data: b"Message was: " + data, id="bytes"),
+            pytest.param("send_bytes", "receive_bytes", b"Hello, world!", lambda data: b"Message was: " + data,
+                         id="bytes"),
             pytest.param("send_json", "receive_json", {"hello": "world"}, lambda data: {"message": data}, id="json"),
         ],
     )
@@ -199,9 +198,12 @@ class TestWebSocketSendReceive:
     @pytest.mark.parametrize(
         ("send_name", "iter_name", "receive_name", "payload", "wrap"),
         [
-            pytest.param("send_text", "iter_text", "receive_text", "Hello, world!", lambda data: "Message was: " + data, id="text"),
-            pytest.param("send_bytes", "iter_bytes", "receive_bytes", b"Hello, world!", lambda data: b"Message was: " + data, id="bytes"),
-            pytest.param("send_json", "iter_json", "receive_json", {"hello": "world"}, lambda data: {"message": data}, id="json"),
+            pytest.param("send_text", "iter_text", "receive_text", "Hello, world!", lambda data: "Message was: " + data,
+                         id="text"),
+            pytest.param("send_bytes", "iter_bytes", "receive_bytes", b"Hello, world!",
+                         lambda data: b"Message was: " + data, id="bytes"),
+            pytest.param("send_json", "iter_json", "receive_json", {"hello": "world"}, lambda data: {"message": data},
+                         id="json"),
         ],
     )
     def test_websocket_iter(
@@ -225,27 +227,37 @@ class TestWebSocketSendReceive:
             assert getattr(websocket, receive_name)() == wrap(payload)
 
     def test_websocket_concurrency_pattern(self, test_client_factory: TestClientFactory) -> None:
-        stream_send: ObjectSendStream[MutableMapping[str, Any]]
-        stream_receive: ObjectReceiveStream[MutableMapping[str, Any]]
-        stream_send, stream_receive = anyio.create_memory_object_stream()
-
-        async def reader(websocket: WebSocket) -> None:
-            async with stream_send:
+        async def reader(
+                websocket: WebSocket,
+                queue: asyncio.Queue[MutableMapping[str, Any] | None],
+        ) -> None:
+            try:
                 async for data in websocket.iter_json():
-                    await stream_send.send(data)
+                    await queue.put(data)
+            finally:
+                queue.put_nowait(None)
 
-        async def writer(websocket: WebSocket) -> None:
-            async with stream_receive:
-                async for message in stream_receive:
-                    await websocket.send_json(message)
+        async def writer(
+                websocket: WebSocket,
+                queue: asyncio.Queue[MutableMapping[str, Any] | None],
+        ) -> None:
+            while (message := await queue.get()) is not None:
+                await websocket.send_json(message)
 
         async def app(scope: Scope, receive: Receive, send: Send) -> None:
             websocket = WebSocket(scope, receive=receive, send=send)
             await websocket.accept()
-            async with anyio.create_task_group() as task_group:
-                task_group.start_soon(reader, websocket)
-                await writer(websocket)
+            queue: asyncio.Queue[MutableMapping[str, Any] | None] = asyncio.Queue()
+            async with asyncio.TaskGroup() as task_group:
+                task_group.create_task(reader(websocket, queue))
+                await writer(websocket, queue)
             await websocket.close()
+
+        client = test_client_factory(app)
+        with client.websocket_connect("/") as websocket:
+            websocket.send_json({"hello": "world"})
+            data = websocket.receive_json()
+            assert data == {"hello": "world"}
 
         client = test_client_factory(app)
         with client.websocket_connect("/") as websocket:
@@ -298,7 +310,8 @@ class TestWebSocketLifecycle:
         ("close_kwargs", "expected_reason"),
         [
             pytest.param({"code": status.WS_1001_GOING_AWAY}, None, id="code_only"),
-            pytest.param({"code": status.WS_1001_GOING_AWAY, "reason": "Going Away"}, "Going Away", id="code_and_reason"),
+            pytest.param({"code": status.WS_1001_GOING_AWAY, "reason": "Going Away"}, "Going Away",
+                         id="code_and_reason"),
         ],
     )
     def test_websocket_close(
@@ -485,7 +498,8 @@ class TestWebSocketDenialResponse:
         client = test_client_factory(app)
         with pytest.raises(
                 RuntimeError,
-                match=("Expected ASGI message \"websocket.http.response.body\", but got 'websocket.http.response.start'"),
+                match=(
+                        "Expected ASGI message \"websocket.http.response.body\", but got 'websocket.http.response.start'"),
         ):
             with client.websocket_connect("/"):
                 pass
@@ -521,6 +535,7 @@ class TestWebSocketStateErrors:
         with pytest.raises(RuntimeError):
             with client.websocket_connect("/"):
                 pass
+
     def test_send_before_accept(self, test_client_factory: TestClientFactory) -> None:
         async def app(scope: Scope, receive: Receive, send: Send) -> None:
             websocket = WebSocket(scope, receive=receive, send=send)
