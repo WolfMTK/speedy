@@ -35,10 +35,10 @@ dev = [
     "pytest<=9.1.1",
     "pytest-cov",
     "pytest-asyncio<=1.4.0",
-    "tox>=4.64.9",
-    "ruff>=0.16.10",
-    "pytest-mock>=3.16.0",
-    "zapros<=0.20.0",
+    "tox>=4.67.1",
+    "ruff>=0.17.1",
+    "pytest-mock>=3.17.0",
+    "zapros<=0.21.0",
 ]
 
 [tool.maturin]
@@ -46,7 +46,7 @@ python-source = "python"
 module-name = "speedy._speedy"
 
 [tool.tox]
-requires = ["tox>=4.64.9", "tox-uv>=0.11.0"]
+requires = ["tox>=4.67.1", "tox-uv>=0.11.0"]
 env_list = ["3.13", "3.14", "3.15"]
 
 [tool.tox.env_run_base]
